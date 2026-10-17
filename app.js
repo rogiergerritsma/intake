@@ -44,6 +44,7 @@ function icoon(paden) {
   paden.forEach(function (d) { var p = document.createElementNS(ns, 'path'); p.setAttribute('d', d); v.appendChild(p); });
   return v;
 }
+function opnemer() { return (lsGet('rg_opnemer') || '').trim(); }
 function kantoor() { return (lsGet('rg_kantoor') || CFG.naam || '').trim(); }
 
 /* ---------- meten (alleen na toestemming) ---------- */
@@ -499,7 +500,7 @@ function roomList() {
   return names.filter(function (n) { var r = G.rooms[n]; return fotosIn(n).length || (r && (r.note || r.staat)); });
 }
 function payload() {
-  return { versie: 4, bureau: kantoor() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
+  return { versie: 4, bureau: kantoor() || null, opgenomen_door: opnemer() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
     adres: G.adres || null, contact: G.contact || null,
     verkoper: { reden: G.reden, reden_toelichting: G.redenTekst || null, timing: G.timing || null,
       prijsverwachting: G.prijs || null, prijsbedrag_eur: G.prijsBedrag ? Number(G.prijsBedrag) : null },
@@ -587,7 +588,8 @@ function bouwPdf(logo) {
   } else { d.text('OPNAME VERKOOPGESPREK', tx, 17, { charSpace: 0.8 }); }
   y = 40;
   txt(G.adres || 'Adres onbekend', 20, true, INK, 1);
-  txt(datum(G.gemaakt) + (G.contact ? '  |  ' + G.contact : ''), 10, false, MUT, 2);
+  txt(datum(G.gemaakt) + (G.contact ? '  |  ' + G.contact : ''), 10, false, MUT, opnemer() ? 1 : 2);
+  if (opnemer()) txt('Opgenomen door ' + clean(opnemer()), 10, false, MUT, 2);
 
   sec('Verkoper');
   kv('Reden van verkoop', G.reden.join(', '));
@@ -636,7 +638,7 @@ function bouwPdf(logo) {
     var n = d.getNumberOfPages();
     for (var i = 1; i <= n; i++) {
       d.setPage(i); d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(MUT[0], MUT[1], MUT[2]);
-      d.text((kantoor() ? clean(kantoor()) + '  |  ' : '') + 'Gemaakt met Rondgang', M, H - 8); d.text(i + ' / ' + n, W - M, H - 8, { align: 'right' });
+      d.text('Gemaakt met Rondgang, een gratis initiatief van Bureau Wonen  |  bureau-wonen.nl  |  ' + MAIL, M, H - 8); d.text(i + ' / ' + n, W - M, H - 8, { align: 'right' });
     }
     return d.output('blob');
   });
@@ -693,7 +695,7 @@ function menuPagina(app) {
   function kop(t) { app.appendChild(el('header', {}, [el('h1', {}, [t])])); }
   if (menu === 'menu') {
     kop('Menu');
-    var items = [['over', 'Over Rondgang', 'Wat het is en waarom'], ['instellingen', 'Instellingen', 'Uw kantoornaam in het rapport'],
+    var items = [['over', 'Over Rondgang', 'Wat het is en waarom'], ['instellingen', 'Instellingen', 'Uw naam en kantoor in het rapport'],
       ['export', 'Gegevens exporteren', 'JSON-bestand per gesprek'], ['privacy', 'Privacyverklaring', ''], gaId() ? ['cookies', 'Cookie-instellingen', ''] : null].filter(Boolean);
     app.appendChild(el('div', { class: 'list' }, items.map(function (i) {
       return el('button', { class: 'menuitem', type: 'button', id: 'm-' + i[0], onclick: function () { menu = i[0]; render(); window.scrollTo(0, 0); } },
@@ -726,9 +728,13 @@ function menuPagina(app) {
     kop('Instellingen');
     var kn = el('input', { type: 'text', id: 'kantoor', placeholder: 'Bijvoorbeeld uw kantoornaam', autocomplete: 'organization' }); kn.value = lsGet('rg_kantoor') || '';
     kn.addEventListener('input', function () { lsSet('rg_kantoor', kn.value); gen = null; });
+    var on = el('input', { type: 'text', id: 'opnemer', placeholder: 'Uw naam als makelaar/opnemer', autocomplete: 'name' }); on.value = lsGet('rg_opnemer') || '';
+    on.addEventListener('input', function () { lsSet('rg_opnemer', on.value); gen = null; });
     app.appendChild(el('div', { class: 'card' }, [
-      el('label', { for: 'kantoor' }, ['Naam in het rapport']), kn,
-      el('span', { class: 'hint' }, ['Staat in de kop van uw PDF-rapport. Laat leeg als u dit niet wilt. Deze naam blijft op uw toestel.'])]));
+      el('label', { for: 'opnemer' }, ['Uw naam (makelaar/opnemer)']), on,
+      el('span', { class: 'hint' }, ['Staat in het rapport als "Opgenomen door". Laat leeg als u dit niet wilt.']),
+      el('label', { for: 'kantoor' }, ['Naam kantoor']), kn,
+      el('span', { class: 'hint' }, ['Staat in de kop van uw PDF-rapport. Laat leeg als u dit niet wilt. Beide namen blijven op uw toestel.'])]));
   } else if (menu === 'export') {
     kop('Gegevens exporteren');
     var box = el('div', { class: 'list' });

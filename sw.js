@@ -1,4 +1,4 @@
-var V = 'rondgang-202610171932';
+var V = 'rondgang-202610172045';
 var A = ['./', 'index.html', 'style.css', 'app.js', 'teksten.js', 'version.js', 'config.json', 'manifest.webmanifest', 'logo.png',
   'vendor/jspdf.umd.min.js', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'fonts/playfair-display-latin-600-normal.woff2', 'fonts/playfair-display-latin-700-normal.woff2',
