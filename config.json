@@ -7,11 +7,14 @@
     "Keuken",
     "Slaapkamer",
     "Slaapkamer 2",
+    "Slaapkamer 3",
     "Badkamer",
     "Toilet",
+    "Meterkast",
     "Zolder",
     "Berging",
     "Garage",
+    "Voortuin",
     "Achtertuin",
     "Voorgevel"
   ],
@@ -102,5 +105,78 @@
     "Parkeergelegenheid": {},
     "Bouwgrond": {},
     "Overig": {}
+  },
+  "kenmerken": {
+    "Keuken": [
+      "Inbouwapparatuur",
+      "Kookeiland",
+      "Schiereiland",
+      "Open keuken",
+      "Gesloten keuken",
+      "Inductie",
+      "Gas",
+      "Quooker of kokendwaterkraan",
+      "Vaatwasser",
+      "Combi-oven of magnetron"
+    ],
+    "Meterkast": [
+      "Groepenkast modern",
+      "Groepenkast verouderd",
+      "3 fasen",
+      "Slimme meter",
+      "Aardlekschakelaar",
+      "Omvormer zonnepanelen",
+      "Ruimte voor uitbreiding"
+    ],
+    "Badkamer": [
+      "Bad",
+      "Inloopdouche",
+      "Dubbele wastafel",
+      "Vloerverwarming",
+      "Ventilatie of mechanische afzuiging"
+    ],
+    "Toilet": [
+      "Hangend toilet",
+      "Fonteintje"
+    ],
+    "Voortuin": [
+      "Verhard",
+      "Gras of beplanting",
+      "Oprit",
+      "Afgesloten"
+    ],
+    "Achtertuin": [
+      "Berging of schuur",
+      "Overkapping",
+      "Op het zuiden",
+      "Op het westen",
+      "Op het oosten",
+      "Op het noorden",
+      "Achterom bereikbaar"
+    ]
+  },
+  "installaties": {
+    "verwarming": [
+      "CV-ketel (gas)",
+      "Hybride warmtepomp",
+      "Warmtepomp (lucht)",
+      "Warmtepomp (bodem)",
+      "Stadsverwarming",
+      "Elektrisch",
+      "Kachel of haard"
+    ],
+    "afgifte": [
+      "Radiatoren",
+      "Vloerverwarming",
+      "Lagetemperatuur"
+    ],
+    "warmwater": [
+      "Combiketel",
+      "Boiler (elektrisch)",
+      "Boiler (gas)",
+      "Warmtepompboiler",
+      "Zonneboiler",
+      "Stadsverwarming"
+    ]
   }
 }

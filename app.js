@@ -123,14 +123,15 @@ function saveNow() { clearTimeout(saveT); if (G) { G.bijgewerkt = Date.now(); re
 
 function nieuw() {
   return { id: uid(), gemaakt: Date.now(), bijgewerkt: Date.now(), adres: '', contact: '', reden: [], redenTekst: '', aantallen: {},
-    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null, fundering: '', energielabel: '', woning: nieuwWoning() };
+    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null, fundering: '', energielabel: '', woning: nieuwWoning(), install: nieuwInstall() };
 }
+function nieuwInstall() { return { verwarming: [], afgifte: [], warmwater: [], ketelBouwjaar: '' }; }
 function nieuwWoning() {
-  return { hoofd: '', soort: '', bouwvorm: '', nieuwbouw: false, aanbouw: false, verdiepingen: '', oprit: '', voortuin: '', parkeren: [] };
+  return { hoofd: '', soort: '', bouwvorm: '', nieuwbouw: false, aanbouw: false, verdiepingen: '', oprit: '', parkeren: [] };
 }
 function bn(b) { return typeof b === 'string' ? b : b.naam; }
 function bAantal(b) { return typeof b === 'object' && b.aantal ? b.aantal : ''; }
-function room(n) { return G.rooms[n] || (G.rooms[n] = { note: '', staat: '' }); }
+function room(n) { return G.rooms[n] || (G.rooms[n] = { note: '', staat: '', kenm: [] }); }
 function fotosIn(n) { return FOTOS.filter(function (f) { return f.ruimte === n; }); }
 function urlOf(f) { return urls[f.id] || (urls[f.id] = URL.createObjectURL(f.blob)); }
 function datum(t) { return new Date(t).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' }); }
@@ -149,7 +150,7 @@ function chipGroup(opts, isOn, toggle, counts) {
   return box;
 }
 function toggleIn(arr, v) { var i = arr.indexOf(v); if (i < 0) arr.push(v); else arr.splice(i, 1); }
-function roomCount(n) { var r = G.rooms[n], c = fotosIn(n).length + (r && r.note ? 1 : 0); return c ? String(c) : ''; }
+function roomCount(n) { var r = G.rooms[n], c = fotosIn(n).length + (r && (r.note || (r.kenm && r.kenm.length)) ? 1 : 0); return c ? String(c) : ''; }
 function refreshCounts() { Object.keys(chipEls).forEach(function (n) { chipEls[n].textContent = roomCount(n); }); }
 
 
@@ -285,6 +286,7 @@ function openGesprek(g) {
   if (!G.reden) G.reden = [];
   if (!G.aantallen) G.aantallen = {};
   if (!G.woning) G.woning = nieuwWoning();
+  if (!G.install) G.install = nieuwInstall();
   fotosVan(g.id).then(function (fs) { FOTOS = fs; render(); });
 }
 
@@ -381,7 +383,6 @@ function vStart(app) {
     el('div', {}, [el('div', { class: 'lbl' }, ['Aantal verdiepingen']),
       chipGroup(['1', '2', '3', '4', '5 of meer'], function (o) { return W.verdiepingen === o; }, function (o) { W.verdiepingen = (W.verdiepingen === o ? '' : o); save(); })]),
     jaNee('oprit', 'Oprit'),
-    jaNee('voortuin', 'Voortuin'),
     el('div', {}, [el('div', { class: 'lbl' }, ['Parkeren']),
       chipGroup(['Openbaar', 'Eigen terrein'], function (o) { return W.parkeren.indexOf(o) >= 0; }, function (o) { toggleIn(W.parkeren, o); save(); })]),
     el('span', { class: 'hint' }, ['Dezelfde indeling als in Kolibri en Funda.'])
@@ -407,6 +408,17 @@ function vStart(app) {
     el('span', { class: 'hint' }, ['Voorlopig vult u dit zelf in. Later haalt Rondgang het automatisch op.'])
   ]));
   paintFund();
+  var I = G.install, IC = CFG.installaties || {};
+  function ig(titel, key) { return el('div', {}, [el('div', { class: 'lbl' }, [titel]),
+    chipGroup(IC[key] || [], function (o) { return I[key].indexOf(o) >= 0; }, function (o) { toggleIn(I[key], o); save(); })]); }
+  var kb = el('input', { type: 'text', inputmode: 'numeric', id: 'ketelbj', placeholder: 'Bijvoorbeeld 2012', maxlength: '4' }); kb.value = I.ketelBouwjaar || '';
+  kb.addEventListener('input', function () { I.ketelBouwjaar = kb.value.replace(/[^0-9]/g, ''); save(); });
+  app.appendChild(el('div', { class: 'card' }, [
+    el('h2', {}, ['Verwarming en warm water']),
+    ig('Verwarming', 'verwarming'), ig('Afgifte', 'afgifte'), ig('Warm water', 'warmwater'),
+    el('label', { for: 'ketelbj' }, ['Bouwjaar ketel of warmtepomp']), kb,
+    el('span', { class: 'hint' }, ['Meerdere antwoorden mogelijk. Het bouwjaar staat meestal op het typeplaatje.'])
+  ]));
 }
 
 function vRondgang(app) {
@@ -449,6 +461,10 @@ function vRondgang(app) {
   var ta = el('textarea', { id: 'note', placeholder: 'Eigen notitie bij deze ruimte. Typ, of dicteer.' }); ta.value = r.note;
   ta.addEventListener('input', function () { r.note = ta.value; save(); refreshCounts(); });
   var staat = chipGroup(CFG.staat, function (o) { return r.staat === o; }, function (o) { r.staat = (r.staat === o ? '' : o); save(); });
+  if (!r.kenm) r.kenm = [];
+  var kl = (CFG.kenmerken || {})[cur];
+  var kenm = kl && kl.length ? el('div', {}, [el('div', { class: 'lbl' }, ['Kenmerken']),
+    chipGroup(kl, function (o) { return r.kenm.indexOf(o) >= 0; }, function (o) { toggleIn(r.kenm, o); save(); refreshCounts(); })]) : null;
   app.appendChild(el('div', { class: 'card' }, [
     el('h2', {}, [cur]),
     el('div', { class: 'row' }, [
@@ -458,6 +474,7 @@ function vRondgang(app) {
     busy ? el('span', { class: 'hint', role: 'status' }, [busy]) : null,
     fs.length ? th : el('span', { class: 'hint' }, ['Nog geen foto.']),
     el('div', { class: 'lbl' }, ['Staat']), staat,
+    kenm,
     el('label', { for: 'note' }, ['Notitie']), ta,
     dictaat(ta),
     el('span', { class: 'hint' }, ['Dicteer alleen uw eigen notities. Neem het gesprek niet op zonder toestemming.'])
@@ -497,7 +514,7 @@ function vAfronden(app) {
 /* ---------- rapport ---------- */
 function roomList() {
   var names = CFG.ruimtes.concat(Object.keys(G.rooms).filter(function (k) { return CFG.ruimtes.indexOf(k) < 0; }));
-  return names.filter(function (n) { var r = G.rooms[n]; return fotosIn(n).length || (r && (r.note || r.staat)); });
+  return names.filter(function (n) { var r = G.rooms[n]; return fotosIn(n).length || (r && (r.note || r.staat || (r.kenm && r.kenm.length))); });
 }
 function payload() {
   return { versie: 4, bureau: kantoor() || null, opgenomen_door: opnemer() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
@@ -505,9 +522,10 @@ function payload() {
     verkoper: { reden: G.reden, reden_toelichting: G.redenTekst || null, timing: G.timing || null,
       prijsverwachting: G.prijs || null, prijsbedrag_eur: G.prijsBedrag ? Number(G.prijsBedrag) : null },
     bijzonderheden: G.bijz.map(function (n) { var v = G.aantallen[n]; return { naam: n, aantal: v ? Number(v) : null }; }), opmerkingen: G.opm || null,
-    ruimtes: roomList().map(function (n) { var r = G.rooms[n] || {}; return { ruimte: n, staat: r.staat || null, notitie: r.note || null, aantal_fotos: fotosIn(n).length }; }),
+    ruimtes: roomList().map(function (n) { var r = G.rooms[n] || {}; return { ruimte: n, staat: r.staat || null, kenmerken: r.kenm && r.kenm.length ? r.kenm : null, notitie: r.note || null, aantal_fotos: fotosIn(n).length }; }),
     woning: { soort_object: G.woning.hoofd || null, soort: G.woning.soort || null, bouwvorm: G.woning.bouwvorm || null, nieuwbouw: G.woning.nieuwbouw, in_aanbouw: G.woning.aanbouw,
-      verdiepingen: G.woning.verdiepingen || null, oprit: G.woning.oprit || null, voortuin: G.woning.voortuin || null, parkeren: G.woning.parkeren },
+      verdiepingen: G.woning.verdiepingen || null, oprit: G.woning.oprit || null, parkeren: G.woning.parkeren },
+    installaties: { verwarming: G.install.verwarming, afgifte: G.install.afgifte, warm_water: G.install.warmwater, bouwjaar_installatie: G.install.ketelBouwjaar ? Number(G.install.ketelBouwjaar) : null },
     fundering: G.fundering ? { klasse: G.fundering, toelichting: FUNDERING[G.fundering] || null } : null, energielabel: G.energielabel || null,
     openbare_bronnen: G.bag ? { bron: 'BAG via PDOK', opgehaald: G.bag.datum, postcode: G.bag.postcode, plaats: G.bag.plaats, gemeente: G.bag.gemeente,
       bouwjaar: G.bag.bouwjaar, gebruiksoppervlakte_m2: G.bag.oppervlakte, gebruiksdoel: G.bag.gebruiksdoel, lat: G.bag.lat, lon: G.bag.lon } : null,
@@ -610,11 +628,14 @@ function bouwPdf(logo) {
   kv('Type', typeTekst().replace(/^, /, ''));
   kv('Aantal verdiepingen', G.woning.verdiepingen);
   kv('Oprit', G.woning.oprit);
-  kv('Voortuin', G.woning.voortuin);
   kv('Parkeren', G.woning.parkeren.join(' en ').toLowerCase());
   kv('Funderingsrisicoklasse', G.fundering ? G.fundering + (FUNDERING[G.fundering] ? ' (' + FUNDERING[G.fundering] + ')' : '') : '');
   if (G.fundering === 'D' || G.fundering === 'E') kv('Aandachtspunt', 'Bij deze klasse volgt in principe aanvullend funderingsonderzoek. Zie ' + FUNDAMENT.replace('https://', '').replace(/\/$/, '') + ' voor regie over het funderingsdossier.');
   kv('Energielabel', G.energielabel);
+  kv('Verwarming', G.install.verwarming.join(', '));
+  kv('Afgifte', G.install.afgifte.join(', '));
+  kv('Warm water', G.install.warmwater.join(', '));
+  kv('Bouwjaar installatie', G.install.ketelBouwjaar);
   kv('Nog zelf op te halen', G.energielabel ? 'WOZ-waarde' : 'energielabel, WOZ-waarde');
 
   var chain = Promise.resolve();
@@ -622,6 +643,7 @@ function bouwPdf(logo) {
     chain = chain.then(function () {
       var r = G.rooms[n] || {}, fs = fotosIn(n);
       sec(n + (r.staat ? '  -  ' + r.staat : ''));
+      if (r.kenm && r.kenm.length) txt(r.kenm.join(', '), 10, false, MUT, 1.5);
       if (r.note) txt(r.note, 11, false, INK, 2);
       var colW = (CW - 4) / 2, boxH = 62, col = 0;
       return fs.reduce(function (p, f) {
@@ -685,7 +707,7 @@ function jsonVan(g) {
   return fotosVan(g.id).then(function (fs) {
     G = g; FOTOS = fs;
     if (typeof G.reden === 'string') G.reden = G.reden ? [G.reden] : [];
-    G.reden = G.reden || []; G.aantallen = G.aantallen || {}; G.bijz = G.bijz || []; G.woning = G.woning || nieuwWoning();
+    G.reden = G.reden || []; G.aantallen = G.aantallen || {}; G.bijz = G.bijz || []; G.woning = G.woning || nieuwWoning(); G.install = G.install || nieuwInstall();
     try { return JSON.stringify(payload(), null, 2); } finally { G = oG; FOTOS = oF; }
   });
 }
