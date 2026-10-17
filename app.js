@@ -10,7 +10,10 @@ var FALLBACK = {
   prijs: ['Dichtbij marktwaarde', 'Hoger verwacht', 'Onzeker'],
   bijzonderheden: [{ naam: 'Zonnepanelen', aantal: 'panelen' }, 'Overpad of recht van weg', 'Verbouwd', 'Erfpacht', 'VvE', 'Vochtplekken']
 };
-var OPHALEN = ['energielabel', 'woz'];
+var OPHALEN = ['woz'];
+var FUNDAMENT = 'https://bureau-fundament.nl/';
+var FUNDERING = { A: 'geen risico', B: 'licht risico', C: 'verhoogd risico of onzekerheid', D: 'hoog risico', E: 'vastgesteld probleem' };
+var LABELS = ['A++++', 'A+++', 'A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'];
 var MAIL = 'mail@bureau-wonen.nl', REPO = 'https://github.com/rogiergerritsma/rondgang';
 
 var CFG = FALLBACK, DB = null, MEM = { gesprekken: {}, fotos: {} };
@@ -118,7 +121,7 @@ function saveNow() { clearTimeout(saveT); if (G) { G.bijgewerkt = Date.now(); re
 
 function nieuw() {
   return { id: uid(), gemaakt: Date.now(), bijgewerkt: Date.now(), adres: '', contact: '', reden: [], redenTekst: '', aantallen: {},
-    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null };
+    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null, fundering: '', energielabel: '' };
 }
 function bn(b) { return typeof b === 'string' ? b : b.naam; }
 function bAantal(b) { return typeof b === 'object' && b.aantal ? b.aantal : ''; }
@@ -345,6 +348,27 @@ function vStart(app) {
     el('div', {}, [el('label', { for: 'redentekst' }, ['Toelichting']), rt]),
     dictaat(rt)
   ]));
+  var fundBox = el('div', { class: 'warn', id: 'fundwarn', hidden: '' });
+  function paintFund() {
+    var k = G.fundering; fundBox.textContent = '';
+    var hoog = k === 'D' || k === 'E';
+    fundBox.hidden = !hoog;
+    if (!hoog) return;
+    fundBox.appendChild(el('b', {}, ['Funderingscode ' + k + '. ']));
+    fundBox.appendChild(document.createTextNode('Bij deze klasse volgt in principe aanvullend onderzoek, en daar lopen transacties vaak op vast. Bureau Fundament neemt de regie over het funderingsdossier. '));
+    fundBox.appendChild(el('a', { class: 'link', id: 'fundlink', href: FUNDAMENT, target: '_blank', rel: 'noopener', onclick: function () { track('fundament_klik', { locatie: 'klasse_' + k }); } }, ['bureau-fundament.nl']));
+  }
+  var fk = chipGroup(['A', 'B', 'C', 'D', 'E', 'Onbekend'], function (o) { return G.fundering === o; }, function (o) { G.fundering = (G.fundering === o ? '' : o); save(); paintFund(); });
+  var el2 = chipGroup(LABELS, function (o) { return G.energielabel === o; }, function (o) { G.energielabel = (G.energielabel === o ? '' : o); save(); });
+  app.appendChild(el('div', { class: 'card' }, [
+    el('h2', {}, ['De woning']),
+    el('div', {}, [el('div', { class: 'lbl' }, ['Funderingsrisicoklasse']), fk]),
+    el('span', { class: 'hint' }, ['A geen risico, B licht, C verhoogd of onzeker, D hoog, E vastgesteld probleem. Staat in het KCAF-rapport, het taxatierapport of de advertentie.']),
+    fundBox,
+    el('div', {}, [el('div', { class: 'lbl' }, ['Energielabel']), el2]),
+    el('span', { class: 'hint' }, ['Voorlopig vult u dit zelf in. Later haalt Rondgang het automatisch op.'])
+  ]));
+  paintFund();
 }
 
 function vRondgang(app) {
@@ -438,12 +462,13 @@ function roomList() {
   return names.filter(function (n) { var r = G.rooms[n]; return fotosIn(n).length || (r && (r.note || r.staat)); });
 }
 function payload() {
-  return { versie: 2, bureau: kantoor() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
+  return { versie: 3, bureau: kantoor() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
     adres: G.adres || null, contact: G.contact || null,
     verkoper: { reden: G.reden, reden_toelichting: G.redenTekst || null, timing: G.timing || null,
       prijsverwachting: G.prijs || null, prijsbedrag_eur: G.prijsBedrag ? Number(G.prijsBedrag) : null },
     bijzonderheden: G.bijz.map(function (n) { var v = G.aantallen[n]; return { naam: n, aantal: v ? Number(v) : null }; }), opmerkingen: G.opm || null,
     ruimtes: roomList().map(function (n) { var r = G.rooms[n] || {}; return { ruimte: n, staat: r.staat || null, notitie: r.note || null, aantal_fotos: fotosIn(n).length }; }),
+    fundering: G.fundering ? { klasse: G.fundering, toelichting: FUNDERING[G.fundering] || null } : null, energielabel: G.energielabel || null,
     openbare_bronnen: G.bag ? { bron: 'BAG via PDOK', opgehaald: G.bag.datum, postcode: G.bag.postcode, plaats: G.bag.plaats, gemeente: G.bag.gemeente,
       bouwjaar: G.bag.bouwjaar, gebruiksoppervlakte_m2: G.bag.oppervlakte, gebruiksdoel: G.bag.gebruiksdoel, lat: G.bag.lat, lon: G.bag.lon } : null,
     op_te_halen: OPHALEN };
@@ -536,7 +561,11 @@ function bouwPdf(logo) {
     kv('Gebruiksdoel', G.bag.gebruiksdoel);
     kv('Opgehaald op', G.bag.datum);
   }
-  kv('Nog zelf op te halen', 'energielabel, WOZ-waarde');
+  sec('Woning');
+  kv('Funderingsrisicoklasse', G.fundering ? G.fundering + (FUNDERING[G.fundering] ? ' (' + FUNDERING[G.fundering] + ')' : '') : '');
+  if (G.fundering === 'D' || G.fundering === 'E') kv('Aandachtspunt', 'Bij deze klasse volgt in principe aanvullend funderingsonderzoek. Zie ' + FUNDAMENT.replace('https://', '').replace(/\/$/, '') + ' voor regie over het funderingsdossier.');
+  kv('Energielabel', G.energielabel);
+  kv('Nog zelf op te halen', G.energielabel ? 'WOZ-waarde' : 'energielabel, WOZ-waarde');
 
   var chain = Promise.resolve();
   roomList().forEach(function (n) {
@@ -571,6 +600,7 @@ function vRapport(app) {
     el('dt', {}, ['Adres']), el('dd', {}, [p.adres || 'Niet ingevuld']),
     p.openbare_bronnen && (p.openbare_bronnen.bouwjaar || p.openbare_bronnen.gebruiksoppervlakte_m2) ? el('dt', {}, ['Bouwjaar en oppervlakte']) : null,
     p.openbare_bronnen && (p.openbare_bronnen.bouwjaar || p.openbare_bronnen.gebruiksoppervlakte_m2) ? el('dd', {}, [[p.openbare_bronnen.bouwjaar, p.openbare_bronnen.gebruiksoppervlakte_m2 ? p.openbare_bronnen.gebruiksoppervlakte_m2 + ' m²' : ''].filter(Boolean).join(', ')]) : null,
+    G.fundering ? el('dt', {}, ['Fundering']) : null, G.fundering ? el('dd', {}, ['Klasse ' + G.fundering + (FUNDERING[G.fundering] ? ', ' + FUNDERING[G.fundering] : '')]) : null,
     el('dt', {}, ['Reden en timing']), el('dd', {}, [p.verkoper.reden.concat(p.verkoper.timing ? [p.verkoper.timing] : []).join(', ') || 'Niet ingevuld']),
     el('dt', {}, ['Toelichting verkoper']), el('dd', {}, [p.verkoper.reden_toelichting || 'Geen']),
     el('dt', {}, ['Bijzonderheden']), el('dd', {}, [bijzTekst() || 'Geen']),
