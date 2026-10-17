@@ -7,7 +7,7 @@ var FALLBACK = {
   staat: ['Goed', 'Redelijk', 'Verouderd'],
   reden: ['Groter', 'Kleiner', 'Verhuizing werk', 'Scheiding', 'Erfenis', 'Senior', 'Anders'],
   woningtypes: { Woonhuis: { soort: ['Eengezinswoning', 'Villa'], bouwvorm: ['Tussen', 'Hoek', 'Vrijstaand'] }, Appartement: { soort: ['Benedenwoning', 'Bovenwoning'], bouwvorm: [] }, Parkeergelegenheid: {}, Bouwgrond: {}, Overig: {} },
-  timing: ['Zo snel mogelijk', 'Binnen 3 maanden', 'Na de zomer', 'Geen haast'],
+  timing: ['Zo snel mogelijk', 'Binnen 3 maanden', 'In overleg', 'Geen haast'],
   prijs: ['Dichtbij marktwaarde', 'Hoger verwacht', 'Onzeker'],
   bijzonderheden: [{ naam: 'Zonnepanelen', aantal: 'panelen' }, 'Overpad of recht van weg', 'Verbouwd', 'Erfpacht', 'VvE', 'Vochtplekken']
 };
