@@ -108,3 +108,24 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 #cookie p{margin:0;font-size:15px}
 #cookie .row{flex-wrap:nowrap}
 #cookie .btn{flex:1 1 0}
+
+/* iPad en groter: ruimere kaders en twee kolommen tijdens een gesprek */
+@media (min-width:700px){
+  body{font-size:19px;padding-block:20px 120px}
+  .wrap{max-width:720px;gap:20px}
+  h1{font-size:34px} h2{font-size:26px}
+  .card{padding:22px;gap:14px}
+  .chip{min-height:52px;font-size:18px}
+  .btn{min-height:56px;font-size:19px}
+  .btn.small{min-height:46px}
+  .thumbs{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  textarea{min-height:140px}
+  nav{justify-content:center}
+  nav button{max-width:200px;min-height:54px;font-size:17px}
+}
+@media (min-width:900px){
+  .wrap.twee{max-width:1080px;display:grid;grid-template-columns:1fr 1fr;align-items:start;gap:20px}
+  .wrap.twee>header,.wrap.twee>.back,.wrap.twee>.sub,.wrap.twee>.warn{grid-column:1/-1}
+  .wrap.twee>.card{height:100%}
+}
+@media (min-width:900px) and (hover:none){ .chip{min-height:56px} }

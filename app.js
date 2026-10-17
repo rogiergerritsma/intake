@@ -641,7 +641,7 @@ function menuPagina(app) {
       mailStatus]));
     app.appendChild(el('div', { class: 'card' }, [
       el('h2', {}, ['Wie maakt dit']),
-      el('p', {}, ['Rondgang is gemaakt door Rogier Gerritsma, makelaar in Abcoude. De code is open en staat op GitHub.']),
+      el('p', {}, ['Rondgang is gemaakt door Rogier Gerritsma, makelaar in Abcoude, als leuk initiatief. De code is open source (MIT) en staat op GitHub.']),
       el('a', { class: 'btn ghost', href: REPO, target: '_blank', rel: 'noopener' }, ['Bekijk de code'])]));
   } else if (menu === 'instellingen') {
     kop('Instellingen');
@@ -687,6 +687,7 @@ function render() {
   if (stopDictaat) stopDictaat();
   var app = $('#app'), nav = $('#nav'); app.textContent = ''; nav.textContent = ''; chipEls = {};
   nav.hidden = !G || !!menu;
+  app.className = 'wrap' + (G && !menu && (tab === 'rondgang' || tab === 'afronden') ? ' twee' : '');
   paintCookie();
   if (menu) { menuPagina(app); return; }
   if (!G) { home(app); return; }

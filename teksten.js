@@ -7,6 +7,9 @@ window.RG_TEKST = {
       'Daarna maakt u met één tik een PDF-rapport.'] },
     { k: 'Waarom', p: [
       'Een goed voorstel begint met een goed beeld van de woning. Wie een offerte maakt, wil achteraf precies weten hoe het huis erbij stond en wat de verkoper belangrijk vond. Rondgang helpt u dat tijdens het gesprek vast te leggen, zonder formulieren en zonder account.'] },
+    { k: 'Een leuk initiatief', p: [
+      'Rondgang is een initiatief van een makelaar, uit plezier gemaakt en om iets nuttigs te delen. Het is niet bedoeld om geld mee te verdienen.',
+      'De code is open source (MIT-licentie). U mag hem gebruiken, aanpassen en delen.'] },
     { k: 'Gratis, zonder rechten', p: [
       'Rondgang is gratis te gebruiken. Het wordt aangeboden zoals het is, zonder garantie. Er kunnen geen rechten aan worden ontleend.',
       'Controleer zelf of een rapport volledig en juist is voordat u er een offerte of advies op baseert. Gegevens uit openbare bronnen kunnen onjuist of verouderd zijn. De maker is niet aansprakelijk voor schade door het gebruik van Rondgang, door verlies van gegevens of door onjuiste gegevens.'] },
