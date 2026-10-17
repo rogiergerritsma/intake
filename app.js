@@ -2,18 +2,18 @@
 'use strict';
 
 var FALLBACK = {
-  naam: 'Bureau Wonen', plaats: '', accent: '#1f6b4f',
+  naam: 'Bureau Wonen', plaats: '', accent: '#B47070', logo: '',
   ruimtes: ['Entree', 'Woonkamer', 'Keuken', 'Slaapkamer', 'Badkamer', 'Toilet', 'Zolder', 'Garage', 'Achtertuin', 'Voorgevel'],
   staat: ['Goed', 'Redelijk', 'Verouderd'],
   reden: ['Groter', 'Kleiner', 'Verhuizing werk', 'Scheiding', 'Erfenis', 'Senior', 'Anders'],
   timing: ['Zo snel mogelijk', 'Binnen 3 maanden', 'Na de zomer', 'Geen haast'],
   prijs: ['Dichtbij marktwaarde', 'Hoger verwacht', 'Onzeker'],
-  bijzonderheden: ['Zonnepanelen', 'Overpad of recht van weg', 'Verbouwd', 'Erfpacht', 'VvE', 'Vochtplekken']
+  bijzonderheden: [{ naam: 'Zonnepanelen', aantal: 'panelen' }, 'Overpad of recht van weg', 'Verbouwd', 'Erfpacht', 'VvE', 'Vochtplekken']
 };
 var OPHALEN = ['kadaster', 'bouwjaar', 'woonoppervlak', 'energielabel', 'woz'];
 
 var CFG = FALLBACK, DB = null, MEM = { gesprekken: {}, fotos: {} };
-var G = null, FOTOS = [], tab = 'start', cur = '', urls = {}, gen = null, busy = '';
+var G = null, FOTOS = [], tab = 'start', cur = '', urls = {}, gen = null, busy = '', stopDictaat = null, logoCache = null;
 var chipEls = {};
 
 function $(s) { return document.querySelector(s); }
@@ -65,9 +65,11 @@ function save() { gen = null; clearTimeout(saveT); saveT = setTimeout(saveNow, 2
 function saveNow() { clearTimeout(saveT); if (G) { G.bijgewerkt = Date.now(); return put('gesprekken', G); } return Promise.resolve(); }
 
 function nieuw() {
-  return { id: uid(), gemaakt: Date.now(), bijgewerkt: Date.now(), adres: '', contact: '', reden: '', redenTekst: '',
+  return { id: uid(), gemaakt: Date.now(), bijgewerkt: Date.now(), adres: '', contact: '', reden: [], redenTekst: '', aantallen: {},
     timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0 };
 }
+function bn(b) { return typeof b === 'string' ? b : b.naam; }
+function bAantal(b) { return typeof b === 'object' && b.aantal ? b.aantal : ''; }
 function room(n) { return G.rooms[n] || (G.rooms[n] = { note: '', staat: '' }); }
 function fotosIn(n) { return FOTOS.filter(function (f) { return f.ruimte === n; }); }
 function urlOf(f) { return urls[f.id] || (urls[f.id] = URL.createObjectURL(f.blob)); }
@@ -93,23 +95,34 @@ function refreshCounts() { Object.keys(chipEls).forEach(function (n) { chipEls[n
 function dictaat(ta) {
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return null;
-  var on = false, rec = null, msg = el('span', { class: 'hint', role: 'status' }, ['']);
+  var want = false, rec = null, leeg = 0, msg = el('span', { class: 'hint', role: 'status' }, ['']);
   var btn = el('button', { class: 'btn small ghost', type: 'button', 'aria-pressed': 'false' }, ['Dicteer']);
-  function stop() { on = false; btn.textContent = 'Dicteer'; btn.setAttribute('aria-pressed', 'false'); }
+  function ui(aan) { btn.textContent = aan ? 'Stop' : 'Dicteer'; btn.setAttribute('aria-pressed', aan ? 'true' : 'false'); msg.textContent = aan ? 'Luistert\u2026' : ''; }
+  function stop() { want = false; ui(false); try { rec && rec.stop(); } catch (e) {} if (stopDictaat === stop) stopDictaat = null; }
+  function start() {
+    rec = new SR(); rec.lang = 'nl-NL'; rec.continuous = true; rec.interimResults = false;
+    rec.onresult = function (e) {
+      leeg = 0;
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) { ta.value = (ta.value ? ta.value + ' ' : '') + e.results[i][0].transcript.trim(); ta.dispatchEvent(new Event('input')); }
+      }
+    };
+    rec.onerror = function (e) {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;
+      want = false; ui(false); msg.textContent = 'Dicteren lukt hier niet (' + (e.error || 'onbekend') + '). Gebruik de microfoon op je toetsenbord.';
+    };
+    /* iOS stopt de herkenning zelf na een pauze: zolang je niet op Stop drukt, starten we opnieuw. */
+    rec.onend = function () {
+      if (want && leeg < 6) { leeg++; setTimeout(function () { if (want) { try { start(); } catch (e) { stop(); } } }, 300); }
+      else if (want) { stop(); msg.textContent = 'Gestopt na een lange stilte.'; }
+    };
+    rec.start();
+  }
   btn.addEventListener('click', function () {
-    if (on) { try { rec.stop(); } catch (e) {} return; }
-    msg.textContent = '';
-    try {
-      rec = new SR(); rec.lang = 'nl-NL'; rec.continuous = true; rec.interimResults = false;
-      rec.onresult = function (e) {
-        for (var i = e.resultIndex; i < e.results.length; i++) {
-          if (e.results[i].isFinal) { ta.value = (ta.value ? ta.value + ' ' : '') + e.results[i][0].transcript.trim(); ta.dispatchEvent(new Event('input')); }
-        }
-      };
-      rec.onerror = function (e) { msg.textContent = 'Dicteren lukt hier niet (' + (e.error || 'onbekend') + '). Gebruik de microfoon op je toetsenbord.'; };
-      rec.onend = stop;
-      rec.start(); on = true; btn.textContent = 'Stop'; btn.setAttribute('aria-pressed', 'true');
-    } catch (e) { stop(); msg.textContent = 'Dicteren lukt hier niet. Gebruik de microfoon op je toetsenbord.'; }
+    if (want) { stop(); return; }
+    if (stopDictaat) stopDictaat();
+    try { want = true; leeg = 0; ui(true); stopDictaat = stop; start(); }
+    catch (e) { stop(); msg.textContent = 'Dicteren lukt hier niet. Gebruik de microfoon op je toetsenbord.'; }
   });
   return el('div', { class: 'row' }, [btn, msg]);
 }
@@ -124,15 +137,16 @@ function shrink(file) {
 }
 
 /* ---------- schermen ---------- */
-function brand() {
-  var l = [];
-  if (CFG.logo) l.push(el('img', { src: CFG.logo, alt: CFG.naam }));
-  l.push(el('span', { class: 'sub' }, [CFG.naam + (CFG.plaats ? ', ' + CFG.plaats : '')]));
-  return el('div', { class: 'brand' }, l);
+function brand() { return el('span', { class: 'sub' }, [CFG.naam + (CFG.plaats ? ', ' + CFG.plaats : '')]); }
+function titel() {
+  var k = [];
+  if (CFG.logo) k.push(el('img', { src: CFG.logo, alt: '' }));
+  k.push(el('h1', {}, ['Rondgang']));
+  return el('div', { class: 'title' }, k);
 }
 
 function home(app) {
-  app.appendChild(el('header', {}, [el('h1', {}, ['Rondgang']), brand()]));
+  app.appendChild(el('header', {}, [titel(), brand()]));
   var isIOS = /iPhone|iPad/.test(navigator.userAgent);
   if (isIOS && !navigator.standalone && lsGet('rondgang.hint') !== '1') {
     app.appendChild(el('div', { class: 'warn' }, [
@@ -142,6 +156,7 @@ function home(app) {
   app.appendChild(el('button', { class: 'btn', type: 'button', id: 'nieuw', onclick: function () { G = nieuw(); FOTOS = []; tab = 'start'; cur = ''; gen = null; put('gesprekken', G); render(); } }, ['Nieuw gesprek']));
   var lijst = el('div', { class: 'list', id: 'lijst' });
   app.appendChild(lijst);
+  if (window.RONDGANG_VERSION) app.appendChild(el('div', { class: 'ver' }, ['versie ' + window.RONDGANG_VERSION]));
   allOf('gesprekken').then(function (a) {
     a.sort(function (x, y) { return y.bijgewerkt - x.bijgewerkt; });
     if (!a.length) { lijst.appendChild(el('p', { class: 'hint' }, ['Nog geen gesprekken. Alles wat je invult blijft op dit toestel.'])); return; }
@@ -163,27 +178,31 @@ function home(app) {
 
 function openGesprek(g) {
   G = g; tab = 'start'; cur = ''; gen = null;
+  if (typeof G.reden === 'string') G.reden = G.reden ? [G.reden] : [];
+  if (!G.reden) G.reden = [];
+  if (!G.aantallen) G.aantallen = {};
   fotosVan(g.id).then(function (fs) { FOTOS = fs; render(); });
 }
 
 function gesprekKop(app) {
   app.appendChild(el('button', { class: 'back', type: 'button', onclick: function () { saveNow().then(function () { G = null; render(); }); } }, ['‹ Gesprekken']));
-  app.appendChild(el('header', {}, [el('h1', {}, ['Rondgang']), el('span', { class: 'sub' }, [G.adres || 'Nieuw gesprek'])]));
+  app.appendChild(el('header', {}, [titel()]));
+  app.appendChild(el('div', { class: 'sub', id: 'adres-sub' }, [G.adres || 'Nieuw gesprek']));
 }
 
 function vStart(app) {
   var adres = el('input', { type: 'text', id: 'adres', placeholder: 'Straat, nummer, plaats', autocomplete: 'off' }); adres.value = G.adres;
-  adres.addEventListener('input', function () { G.adres = adres.value; var s = document.querySelector('header .sub'); if (s) s.textContent = G.adres || 'Nieuw gesprek'; save(); });
+  adres.addEventListener('input', function () { G.adres = adres.value; var s = document.getElementById('adres-sub'); if (s) s.textContent = G.adres || 'Nieuw gesprek'; save(); });
   var contact = el('input', { type: 'text', id: 'contact', placeholder: 'Naam verkoper', autocomplete: 'off' }); contact.value = G.contact;
   contact.addEventListener('input', function () { G.contact = contact.value; save(); });
   var rt = el('textarea', { id: 'redentekst', placeholder: 'Waarom verkopen ze? Typ, of dicteer.' }); rt.value = G.redenTekst || '';
   rt.addEventListener('input', function () { G.redenTekst = rt.value; save(); });
-  var rc = chipGroup(CFG.reden, function (o) { return G.reden === o; }, function (o) { G.reden = (G.reden === o ? '' : o); save(); });
+  var rc = chipGroup(CFG.reden, function (o) { return G.reden.indexOf(o) >= 0; }, function (o) { toggleIn(G.reden, o); save(); });
   app.appendChild(el('div', { class: 'card' }, [
     el('h2', {}, ['Het gesprek']),
     el('div', {}, [el('label', { for: 'adres' }, ['Adres']), adres]),
     el('div', {}, [el('label', { for: 'contact' }, ['Contactpersoon']), contact]),
-    el('div', {}, [el('div', { class: 'lbl' }, ['Reden van verkoop']), rc]),
+    el('div', {}, [el('div', { class: 'lbl' }, ['Reden(en) van verkoop']), rc]),
     el('div', {}, [el('label', { for: 'redentekst' }, ['Toelichting']), rt]),
     dictaat(rt),
     el('div', { class: 'auto' }, [el('b', {}, ['Hoef je niet te vragen. ']), 'Kadaster, bouwjaar, woonoppervlak, energielabel en WOZ komen uit openbare bronnen. Dat ophalen is nog niet gekoppeld.'])
@@ -257,8 +276,21 @@ function vAfronden(app) {
   app.appendChild(q('Gewenste timing', CFG.timing, 'timing'));
   app.appendChild(el('div', { class: 'card' }, [el('div', { class: 'lbl' }, ['Prijsverwachting verkoper']),
     chipGroup(CFG.prijs, function (o) { return G.prijs === o; }, function (o) { G.prijs = (G.prijs === o ? '' : o); save(); }), bed]));
+  var aantalBox = el('div', { class: 'stack' });
+  function paintAantal() {
+    aantalBox.textContent = '';
+    CFG.bijzonderheden.forEach(function (b) {
+      var n = bn(b), u = bAantal(b);
+      if (!u || G.bijz.indexOf(n) < 0) return;
+      var inp = el('input', { type: 'number', inputmode: 'numeric', min: '0', id: 'aantal-' + n, placeholder: 'Aantal' });
+      inp.value = G.aantallen[n] || '';
+      inp.addEventListener('input', function () { G.aantallen[n] = inp.value; save(); });
+      aantalBox.appendChild(el('div', { class: 'inline' }, [el('label', { for: 'aantal-' + n }, [n + ', aantal ' + u]), inp]));
+    });
+  }
+  paintAantal();
   app.appendChild(el('div', { class: 'card' }, [el('div', { class: 'lbl' }, ['Bijzonderheden (meerdere mogelijk)']),
-    chipGroup(CFG.bijzonderheden, function (o) { return G.bijz.indexOf(o) >= 0; }, function (o) { toggleIn(G.bijz, o); save(); })]));
+    chipGroup(CFG.bijzonderheden.map(bn), function (o) { return G.bijz.indexOf(o) >= 0; }, function (o) { toggleIn(G.bijz, o); save(); paintAantal(); }), aantalBox]));
   app.appendChild(el('div', { class: 'card' }, [el('label', { for: 'opm' }, ['Opmerkingen']), op, dictaat(op)]));
 }
 
@@ -270,11 +302,17 @@ function roomList() {
 function payload() {
   return { versie: 1, bureau: CFG.naam, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
     adres: G.adres || null, contact: G.contact || null,
-    verkoper: { reden: G.reden || null, reden_toelichting: G.redenTekst || null, timing: G.timing || null,
+    verkoper: { reden: G.reden, reden_toelichting: G.redenTekst || null, timing: G.timing || null,
       prijsverwachting: G.prijs || null, prijsbedrag_eur: G.prijsBedrag ? Number(G.prijsBedrag) : null },
-    bijzonderheden: G.bijz, opmerkingen: G.opm || null,
+    bijzonderheden: G.bijz.map(function (n) { var v = G.aantallen[n]; return { naam: n, aantal: v ? Number(v) : null }; }), opmerkingen: G.opm || null,
     ruimtes: roomList().map(function (n) { var r = G.rooms[n] || {}; return { ruimte: n, staat: r.staat || null, notitie: r.note || null, aantal_fotos: fotosIn(n).length }; }),
     op_te_halen: OPHALEN };
+}
+function bijzTekst() {
+  return G.bijz.map(function (n) {
+    var b = CFG.bijzonderheden.filter(function (x) { return bn(x) === n; })[0], v = G.aantallen[n];
+    return n + (v && b ? ' (' + v + ' ' + (bAantal(b) || '') + ')' : '');
+  }).join(', ');
 }
 function bestandsnaam(ext) {
   var a = (G.adres || 'gesprek').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
@@ -304,7 +342,19 @@ function clean(s) {
 }
 function toDataURL(b) { return new Promise(function (r) { var f = new FileReader(); f.onload = function () { r(f.result); }; f.readAsDataURL(b); }); }
 
-function maakPdf() {
+function laadLogo() {
+  if (!CFG.logo) return Promise.resolve(null);
+  if (logoCache) return Promise.resolve(logoCache);
+  return fetch(CFG.logo).then(function (r) { return r.blob(); }).then(toDataURL).then(function (u) {
+    return new Promise(function (res) {
+      var im = new Image();
+      im.onload = function () { logoCache = { url: u, w: im.naturalWidth, h: im.naturalHeight }; res(logoCache); };
+      im.onerror = function () { res(null); }; im.src = u;
+    });
+  }).catch(function () { return null; });
+}
+function maakPdf() { return laadLogo().then(bouwPdf); }
+function bouwPdf(logo) {
   var J = window.jspdf.jsPDF, d = new J({ unit: 'mm', format: 'a4', compress: true });
   var W = 210, H = 297, M = 18, CW = W - 2 * M, y = 0, ac = hex2rgb(CFG.accent), INK = [24, 35, 31], MUT = [91, 106, 100];
   function need(h) { if (y + h > H - 16) { d.addPage(); y = M; } }
@@ -317,18 +367,22 @@ function maakPdf() {
   function sec(t) { y += 3; need(14); txt(t.toUpperCase(), 9, true, ac, 1); d.setDrawColor(ac[0], ac[1], ac[2]); d.setLineWidth(0.3); d.line(M, y, W - M, y); y += 3; }
   function kv(k, v) { if (!v) return; txt(k, 8, true, MUT, 0); txt(v, 11, false, INK, 2.5); }
 
-  d.setFillColor(ac[0], ac[1], ac[2]); d.rect(0, 0, W, 24, 'F');
-  d.setTextColor(255, 255, 255); d.setFont('helvetica', 'bold'); d.setFontSize(15); d.text(clean(CFG.naam), M, 15);
-  d.setFont('helvetica', 'normal'); d.setFontSize(10); d.text('Opname verkoopgesprek', W - M, 15, { align: 'right' });
-  y = 34;
+  d.setFillColor(243, 235, 228); d.rect(0, 0, W, 28, 'F');
+  d.setFillColor(ac[0], ac[1], ac[2]); d.rect(0, 28, W, 0.6, 'F');
+  var tx = M;
+  if (logo) { var lh = 20, lw = lh * logo.w / logo.h; d.addImage(logo.url, 'PNG', M, 4, lw, lh); tx = M + lw + 5; }
+  d.setTextColor(INK[0], INK[1], INK[2]); d.setFont('helvetica', 'bold'); d.setFontSize(15); d.text(clean(CFG.naam).toUpperCase(), tx, 14);
+  d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(MUT[0], MUT[1], MUT[2]); d.text('OPNAME VERKOOPGESPREK', tx, 20, { charSpace: 0.8 });
+  y = 40;
   txt(G.adres || 'Adres onbekend', 20, true, INK, 1);
   txt(datum(G.gemaakt) + (G.contact ? '  |  ' + G.contact : ''), 10, false, MUT, 2);
 
   sec('Verkoper');
-  kv('Reden van verkoop', [G.reden, G.redenTekst].filter(Boolean).join(': '));
+  kv('Reden van verkoop', G.reden.join(', '));
+  kv('Toelichting', G.redenTekst);
   kv('Gewenste timing', G.timing);
   kv('Prijsverwachting', [G.prijs, G.prijsBedrag ? 'EUR ' + Number(G.prijsBedrag).toLocaleString('nl-NL') : ''].filter(Boolean).join(', '));
-  if (G.bijz.length) kv('Bijzonderheden', G.bijz.join(', '));
+  if (G.bijz.length) kv('Bijzonderheden', bijzTekst());
   kv('Opmerkingen', G.opm);
   kv('Nog op te halen uit openbare bronnen', OPHALEN.join(', '));
 
@@ -363,9 +417,9 @@ function vRapport(app) {
   var p = payload(), nf = FOTOS.length;
   var dl = el('dl', { class: 'sum' }, [
     el('dt', {}, ['Adres']), el('dd', {}, [p.adres || 'Niet ingevuld']),
-    el('dt', {}, ['Reden en timing']), el('dd', {}, [[p.verkoper.reden, p.verkoper.timing].filter(Boolean).join(', ') || 'Niet ingevuld']),
+    el('dt', {}, ['Reden en timing']), el('dd', {}, [p.verkoper.reden.concat(p.verkoper.timing ? [p.verkoper.timing] : []).join(', ') || 'Niet ingevuld']),
     el('dt', {}, ['Toelichting verkoper']), el('dd', {}, [p.verkoper.reden_toelichting || 'Geen']),
-    el('dt', {}, ['Bijzonderheden']), el('dd', {}, [p.bijzonderheden.join(', ') || 'Geen']),
+    el('dt', {}, ['Bijzonderheden']), el('dd', {}, [bijzTekst() || 'Geen']),
     el('dt', {}, ['Ruimtes']), el('dd', {}, [p.ruimtes.length + ' met inhoud, ' + nf + ' foto’s'])]);
   var status = el('span', { class: 'hint', role: 'status' }, ['']);
   var acties = el('div', { class: 'row' });
@@ -387,6 +441,7 @@ function vRapport(app) {
 }
 
 function render() {
+  if (stopDictaat) stopDictaat();
   var app = $('#app'), nav = $('#nav'); app.textContent = ''; nav.textContent = ''; chipEls = {};
   nav.hidden = !G;
   if (!G) { home(app); return; }

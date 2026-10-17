@@ -1,11 +1,60 @@
 {
   "naam": "Bureau Wonen",
   "plaats": "Abcoude",
-  "accent": "#1f6b4f",
-  "ruimtes": ["Entree", "Woonkamer", "Keuken", "Slaapkamer", "Slaapkamer 2", "Badkamer", "Toilet", "Zolder", "Berging", "Garage", "Achtertuin", "Voorgevel"],
-  "staat": ["Goed", "Redelijk", "Verouderd"],
-  "reden": ["Groter", "Kleiner", "Verhuizing werk", "Scheiding", "Erfenis", "Senior", "Nieuwbouw gekocht", "Anders"],
-  "timing": ["Zo snel mogelijk", "Binnen 3 maanden", "Na de zomer", "Geen haast"],
-  "prijs": ["Dichtbij marktwaarde", "Hoger verwacht", "Onzeker"],
-  "bijzonderheden": ["Zonnepanelen", "Overpad of recht van weg", "Verbouwd", "Vergunning bekend", "Asbest vermoed", "Erfpacht", "VvE", "Funderingsissue", "Vochtplekken"]
+  "accent": "#B47070",
+  "ruimtes": [
+    "Entree",
+    "Woonkamer",
+    "Keuken",
+    "Slaapkamer",
+    "Slaapkamer 2",
+    "Badkamer",
+    "Toilet",
+    "Zolder",
+    "Berging",
+    "Garage",
+    "Achtertuin",
+    "Voorgevel"
+  ],
+  "staat": [
+    "Goed",
+    "Redelijk",
+    "Verouderd"
+  ],
+  "reden": [
+    "Groter",
+    "Kleiner",
+    "Verhuizing werk",
+    "Scheiding",
+    "Erfenis",
+    "Senior",
+    "Nieuwbouw gekocht",
+    "Anders"
+  ],
+  "timing": [
+    "Zo snel mogelijk",
+    "Binnen 3 maanden",
+    "Na de zomer",
+    "Geen haast"
+  ],
+  "prijs": [
+    "Dichtbij marktwaarde",
+    "Hoger verwacht",
+    "Onzeker"
+  ],
+  "bijzonderheden": [
+    {
+      "naam": "Zonnepanelen",
+      "aantal": "panelen"
+    },
+    "Overpad of recht van weg",
+    "Verbouwd",
+    "Vergunning bekend",
+    "Asbest vermoed",
+    "Erfpacht",
+    "VvE",
+    "Funderingsissue",
+    "Vochtplekken"
+  ],
+  "logo": "logo.png"
 }
