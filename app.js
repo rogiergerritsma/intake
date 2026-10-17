@@ -2,7 +2,7 @@
 'use strict';
 
 var FALLBACK = {
-  naam: 'Bureau Wonen', plaats: '', accent: '#B47070', logo: '',
+  naam: '', plaats: '', analytics: { ga: '' }, accent: '#B47070', logo: '',
   ruimtes: ['Entree', 'Woonkamer', 'Keuken', 'Slaapkamer', 'Badkamer', 'Toilet', 'Zolder', 'Garage', 'Achtertuin', 'Voorgevel'],
   staat: ['Goed', 'Redelijk', 'Verouderd'],
   reden: ['Groter', 'Kleiner', 'Verhuizing werk', 'Scheiding', 'Erfenis', 'Senior', 'Anders'],
@@ -10,11 +10,12 @@ var FALLBACK = {
   prijs: ['Dichtbij marktwaarde', 'Hoger verwacht', 'Onzeker'],
   bijzonderheden: [{ naam: 'Zonnepanelen', aantal: 'panelen' }, 'Overpad of recht van weg', 'Verbouwd', 'Erfpacht', 'VvE', 'Vochtplekken']
 };
-var OPHALEN = ['kadaster', 'bouwjaar', 'woonoppervlak', 'energielabel', 'woz'];
+var OPHALEN = ['energielabel', 'woz'];
+var MAIL = 'mail@bureau-wonen.nl', REPO = 'https://github.com/rogiergerritsma/rondgang';
 
 var CFG = FALLBACK, DB = null, MEM = { gesprekken: {}, fotos: {} };
 var G = null, FOTOS = [], tab = 'start', cur = '', urls = {}, gen = null, busy = '', stopDictaat = null, logoCache = null;
-var chipEls = {};
+var chipEls = {}, menu = '', bagTok = 0;
 
 function $(s) { return document.querySelector(s); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -30,6 +31,57 @@ function el(t, a, k) {
 }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+
+function icoon(paden) {
+  var ns = 'http://www.w3.org/2000/svg', v = document.createElementNS(ns, 'svg');
+  v.setAttribute('viewBox', '0 0 24 24'); v.setAttribute('width', '20'); v.setAttribute('height', '20'); v.setAttribute('aria-hidden', 'true');
+  v.setAttribute('fill', 'none'); v.setAttribute('stroke', 'currentColor'); v.setAttribute('stroke-width', '1.8'); v.setAttribute('stroke-linecap', 'round'); v.setAttribute('stroke-linejoin', 'round');
+  paden.forEach(function (d) { var p = document.createElementNS(ns, 'path'); p.setAttribute('d', d); v.appendChild(p); });
+  return v;
+}
+function kantoor() { return (lsGet('rg_kantoor') || CFG.naam || '').trim(); }
+
+/* ---------- meten (alleen na toestemming) ---------- */
+function gaId() { return (CFG.analytics && CFG.analytics.ga) || ''; }
+function keuze() { return lsGet('rg_cookiekeuze'); }
+function laadGA() {
+  if (!gaId() || keuze() !== 'ja' || window.__gaLoaded) return;
+  window.__gaLoaded = 1; window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { window.dataLayer.push(arguments); };
+  window.gtag('js', new Date());
+  window.gtag('config', gaId(), { allow_google_signals: false, allow_ad_personalization_signals: false });
+  document.head.appendChild(el('script', { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId()) }));
+}
+/* Alleen gebruik van de app, nooit wat er is ingevuld. */
+function track(naam, par) { if (window.gtag && keuze() === 'ja') window.gtag('event', naam, par || {}); }
+function wisGaCookies() {
+  var h = location.hostname.split('.'), doms = [''];
+  for (var i = 0; i < h.length - 1; i++) doms.push('; domain=.' + h.slice(i).join('.'));
+  document.cookie.split(';').forEach(function (c) {
+    var n = c.split('=')[0].trim();
+    if (/^_ga/.test(n)) doms.forEach(function (d) { document.cookie = n + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + d; });
+  });
+}
+function zetKeuze(v) {
+  var was = keuze();
+  if (v) lsSet('rg_cookiekeuze', v); else { try { localStorage.removeItem('rg_cookiekeuze'); } catch (e) {} }
+  if (was === 'ja' && v !== 'ja') { wisGaCookies(); location.reload(); return; }
+  if (v === 'ja') laadGA();
+  paintCookie(); if (menu === 'cookies') render();
+}
+function paintCookie() {
+  var c = $('#cookie'); if (!c) return;
+  c.textContent = '';
+  var tonen = gaId() && !keuze();
+  c.hidden = !tonen; c.className = (G && !menu) ? 'metnav' : '';
+  if (!tonen) return;
+  c.appendChild(el('p', {}, ['Mogen we met Google Analytics meten hoe bezoekers deze site gebruiken? Zo zien we wat werkt. ',
+    el('button', { class: 'link', type: 'button', onclick: function () { menu = 'privacy'; render(); window.scrollTo(0, 0); } }, ['Privacyverklaring'])]));
+  c.appendChild(el('div', { class: 'row' }, [
+    el('button', { class: 'btn small', type: 'button', id: 'ck-ja', onclick: function () { zetKeuze('ja'); } }, ['Prima']),
+    el('button', { class: 'btn small', type: 'button', id: 'ck-nee', onclick: function () { zetKeuze('nee'); } }, ['Liever niet'])]));
+}
 
 /* ---------- opslag: IndexedDB, met geheugen als noodoplossing ---------- */
 function openDB() {
@@ -66,7 +118,7 @@ function saveNow() { clearTimeout(saveT); if (G) { G.bijgewerkt = Date.now(); re
 
 function nieuw() {
   return { id: uid(), gemaakt: Date.now(), bijgewerkt: Date.now(), adres: '', contact: '', reden: [], redenTekst: '', aantallen: {},
-    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0 };
+    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null };
 }
 function bn(b) { return typeof b === 'string' ? b : b.naam; }
 function bAantal(b) { return typeof b === 'object' && b.aantal ? b.aantal : ''; }
@@ -92,6 +144,39 @@ function toggleIn(arr, v) { var i = arr.indexOf(v); if (i < 0) arr.push(v); else
 function roomCount(n) { var r = G.rooms[n], c = fotosIn(n).length + (r && r.note ? 1 : 0); return c ? String(c) : ''; }
 function refreshCounts() { Object.keys(chipEls).forEach(function (n) { chipEls[n].textContent = roomCount(n); }); }
 
+
+/* ---------- adres-tool: PDOK Locatieserver + BAG (gratis, zonder sleutel) ---------- */
+var PDOK = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/';
+var BAGWFS = 'https://service.pdok.nl/lv/bag/wfs/v2_0';
+function jget(u) { return fetch(u).then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); }); }
+function zoekAdres(q) {
+  return jget(PDOK + 'suggest?rows=5&fq=type:adres&q=' + encodeURIComponent(q)).then(function (j) { return (j.response && j.response.docs) || []; });
+}
+function haalBag(sug) {
+  var fl = 'weergavenaam,postcode,woonplaatsnaam,gemeentenaam,centroide_ll,adresseerbaarobject_id';
+  return jget(PDOK + 'lookup?id=' + encodeURIComponent(sug.id) + '&fl=' + fl).then(function (j) {
+    var d = j.response && j.response.docs && j.response.docs[0];
+    if (!d) throw new Error('geen adres');
+    var out = { adres: d.weergavenaam, postcode: d.postcode || null, plaats: d.woonplaatsnaam || null, gemeente: d.gemeentenaam || null,
+      lat: null, lon: null, bouwjaar: null, oppervlakte: null, gebruiksdoel: null, datum: new Date().toISOString().slice(0, 10) };
+    var m = /POINT\(([-\d.]+) ([-\d.]+)\)/.exec(d.centroide_ll || '');
+    if (m) { out.lon = Number(m[1]); out.lat = Number(m[2]); }
+    if (!d.adresseerbaarobject_id) return out;
+    var f = '<Filter><PropertyIsEqualTo><PropertyName>identificatie</PropertyName><Literal>' + d.adresseerbaarobject_id + '</Literal></PropertyIsEqualTo></Filter>';
+    return jget(BAGWFS + '?service=WFS&version=2.0.0&request=GetFeature&typeNames=bag:verblijfsobject&outputFormat=application/json&count=5&filter=' + encodeURIComponent(f))
+      .then(function (w) {
+        var fs = (w.features || []).map(function (x) { return x.properties || {}; });
+        var pr = fs.filter(function (x) { return /in gebruik/i.test(x.status || ''); })[0] || fs[0];
+        if (pr) {
+          if (pr.bouwjaar > 0) out.bouwjaar = pr.bouwjaar;
+          if (pr.oppervlakte > 0 && pr.oppervlakte < 99999) out.oppervlakte = pr.oppervlakte;
+          out.gebruiksdoel = [].concat(pr.gebruiksdoel || []).join(', ') || null;
+        }
+        return out;
+      }).catch(function () { return out; });
+  });
+}
+
 function dictaat(ta) {
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) return null;
@@ -109,7 +194,7 @@ function dictaat(ta) {
     };
     rec.onerror = function (e) {
       if (e.error === 'no-speech' || e.error === 'aborted') return;
-      want = false; ui(false); msg.textContent = 'Dicteren lukt hier niet (' + (e.error || 'onbekend') + '). Gebruik de microfoon op je toetsenbord.';
+      want = false; ui(false); msg.textContent = 'Dicteren lukt hier niet (' + (e.error || 'onbekend') + '). Gebruik de microfoon op uw toetsenbord.';
     };
     /* iOS stopt de herkenning zelf na een pauze: zolang je niet op Stop drukt, starten we opnieuw. */
     rec.onend = function () {
@@ -122,7 +207,7 @@ function dictaat(ta) {
     if (want) { stop(); return; }
     if (stopDictaat) stopDictaat();
     try { want = true; leeg = 0; ui(true); stopDictaat = stop; start(); }
-    catch (e) { stop(); msg.textContent = 'Dicteren lukt hier niet. Gebruik de microfoon op je toetsenbord.'; }
+    catch (e) { stop(); msg.textContent = 'Dicteren lukt hier niet. Gebruik de microfoon op uw toetsenbord.'; }
   });
   return el('div', { class: 'row' }, [btn, msg]);
 }
@@ -137,7 +222,10 @@ function shrink(file) {
 }
 
 /* ---------- schermen ---------- */
-function brand() { return el('span', { class: 'sub' }, [CFG.naam + (CFG.plaats ? ', ' + CFG.plaats : '')]); }
+function infoKnop() {
+  return el('button', { class: 'iconbtn', type: 'button', id: 'info', 'aria-label': 'Info en menu', onclick: function () { saveNow(); menu = 'menu'; render(); window.scrollTo(0, 0); } },
+    [icoon(['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 11v5', 'M12 7.5v.01']), 'Info']);
+}
 function titel() {
   var k = [];
   if (CFG.logo) k.push(el('img', { src: CFG.logo, alt: '' }));
@@ -146,20 +234,27 @@ function titel() {
 }
 
 function home(app) {
-  app.appendChild(el('header', {}, [titel(), brand()]));
+  app.appendChild(el('header', {}, [titel(), infoKnop()]));
   var isIOS = /iPhone|iPad/.test(navigator.userAgent);
   if (isIOS && !navigator.standalone && lsGet('rondgang.hint') !== '1') {
     app.appendChild(el('div', { class: 'warn' }, [
-      'Zet Rondgang op je beginscherm (deel-icoon, dan Zet op beginscherm). Zo bewaart je iPhone de gesprekken betrouwbaarder. ',
+      'Zet Rondgang op uw beginscherm (deel-icoon, dan Zet op beginscherm). Zo bewaart uw iPhone de gesprekken betrouwbaarder. ',
       el('button', { class: 'back', type: 'button', onclick: function () { lsSet('rondgang.hint', '1'); render(); } }, ['Begrepen'])]));
   }
-  app.appendChild(el('button', { class: 'btn', type: 'button', id: 'nieuw', onclick: function () { G = nieuw(); FOTOS = []; tab = 'start'; cur = ''; gen = null; put('gesprekken', G); render(); } }, ['Nieuw gesprek']));
+  app.appendChild(el('div', { class: 'card intro' }, [
+    el('h2', {}, ['Snel vastleggen tijdens het verkoopgesprek']),
+    el('p', {}, ['Foto’s, notities en dictaat per ruimte, plus de wensen van de verkoper. Daarna maakt u een PDF-rapport waarmee u een goede offerte maakt, omdat u precies weet hoe het huis was.']),
+    el('p', { class: 'hint' }, ['Gratis. Alles blijft op uw toestel. ', el('button', { class: 'link', type: 'button', onclick: function () { menu = 'over'; render(); window.scrollTo(0, 0); } }, ['Meer over Rondgang'])])]));
+  app.appendChild(el('button', { class: 'btn', type: 'button', id: 'nieuw', onclick: function () { G = nieuw(); FOTOS = []; tab = 'start'; cur = ''; gen = null; put('gesprekken', G); track('gesprek_gestart'); render(); } }, ['Nieuw gesprek']));
   var lijst = el('div', { class: 'list', id: 'lijst' });
   app.appendChild(lijst);
+  app.appendChild(el('div', { class: 'foot' }, [
+    el('button', { class: 'link', type: 'button', onclick: function () { menu = 'privacy'; render(); window.scrollTo(0, 0); } }, ['Privacyverklaring']),
+    gaId() ? el('button', { class: 'link', type: 'button', onclick: function () { menu = 'cookies'; render(); window.scrollTo(0, 0); } }, ['Cookie-instellingen']) : null]));
   if (window.RONDGANG_VERSION) app.appendChild(el('div', { class: 'ver' }, ['versie ' + window.RONDGANG_VERSION]));
   allOf('gesprekken').then(function (a) {
     a.sort(function (x, y) { return y.bijgewerkt - x.bijgewerkt; });
-    if (!a.length) { lijst.appendChild(el('p', { class: 'hint' }, ['Nog geen gesprekken. Alles wat je invult blijft op dit toestel.'])); return; }
+    if (!a.length) { lijst.appendChild(el('p', { class: 'hint' }, ['Nog geen gesprekken. Alles wat u invult blijft op dit toestel.'])); return; }
     a.forEach(function (g) {
       var sure = false;
       var d = el('button', { class: 'btn small danger', type: 'button', 'aria-label': 'Verwijder gesprek' }, ['Verwijder']);
@@ -186,13 +281,56 @@ function openGesprek(g) {
 
 function gesprekKop(app) {
   app.appendChild(el('button', { class: 'back', type: 'button', onclick: function () { saveNow().then(function () { G = null; render(); }); } }, ['‹ Gesprekken']));
-  app.appendChild(el('header', {}, [titel()]));
+  app.appendChild(el('header', {}, [titel(), infoKnop()]));
   app.appendChild(el('div', { class: 'sub', id: 'adres-sub' }, [G.adres || 'Nieuw gesprek']));
 }
 
 function vStart(app) {
-  var adres = el('input', { type: 'text', id: 'adres', placeholder: 'Straat, nummer, plaats', autocomplete: 'off' }); adres.value = G.adres;
-  adres.addEventListener('input', function () { G.adres = adres.value; var s = document.getElementById('adres-sub'); if (s) s.textContent = G.adres || 'Nieuw gesprek'; save(); });
+  var adres = el('input', { type: 'text', id: 'adres', placeholder: 'Straat, nummer, plaats', autocomplete: 'off', autocapitalize: 'words',
+    role: 'combobox', 'aria-autocomplete': 'list', 'aria-expanded': 'false', 'aria-controls': 'sug' }); adres.value = G.adres;
+  var sug = el('div', { class: 'sug', id: 'sug', role: 'listbox', hidden: '' });
+  var bagBox = el('div', { class: 'auto', id: 'bag', hidden: '' }), bagMsg = '';
+  var timer = null;
+  function sluit() { sug.hidden = true; sug.textContent = ''; adres.setAttribute('aria-expanded', 'false'); }
+  function paintBag() {
+    bagBox.textContent = '';
+    var b = G.bag;
+    if (!b && !bagMsg) { bagBox.hidden = true; return; }
+    bagBox.hidden = false;
+    if (bagMsg) { bagBox.appendChild(el('span', {}, [bagMsg])); }
+    if (!b) return;
+    bagBox.appendChild(el('b', {}, ['Uit openbare bronnen (BAG). ']));
+    var regels = [['Postcode en plaats', [b.postcode, b.plaats].filter(Boolean).join(' ')], ['Bouwjaar', b.bouwjaar], ['Gebruiksoppervlakte', b.oppervlakte ? b.oppervlakte + ' m²' : ''], ['Gebruiksdoel', b.gebruiksdoel]]
+      .filter(function (r) { return r[1]; });
+    var dl = el('dl', { class: 'sum bagdl' }, []);
+    regels.forEach(function (r) { dl.appendChild(el('dt', {}, [r[0]])); dl.appendChild(el('dd', {}, [String(r[1])])); });
+    bagBox.appendChild(dl);
+    bagBox.appendChild(el('span', { class: 'hint' }, ['Controleer dit zelf. Energielabel en WOZ-waarde haalt u nog zelf op.']));
+  }
+  function kies(d) {
+    sluit(); adres.value = d.weergavenaam; G.adres = d.weergavenaam; G.bag = null; bagMsg = 'Gegevens ophalen…'; paintBag();
+    var sub = document.getElementById('adres-sub'); if (sub) sub.textContent = G.adres;
+    var my = ++bagTok; save(); track('adres_gekozen');
+    haalBag(d).then(function (b) { if (my !== bagTok || !G) return; G.bag = b; bagMsg = ''; save(); paintBag(); })
+      .catch(function () { if (my !== bagTok) return; bagMsg = 'Ophalen lukte niet. U kunt het adres gewoon zelf invullen.'; paintBag(); });
+  }
+  adres.addEventListener('input', function () {
+    G.adres = adres.value;
+    if (G.bag && G.bag.adres !== adres.value) { G.bag = null; bagMsg = ''; bagTok++; paintBag(); }
+    var sub = document.getElementById('adres-sub'); if (sub) sub.textContent = G.adres || 'Nieuw gesprek'; save();
+    clearTimeout(timer);
+    var q = adres.value.trim();
+    if (q.length < 3) { sluit(); return; }
+    timer = setTimeout(function () {
+      zoekAdres(q).then(function (docs) {
+        if (adres.value.trim() !== q) return;
+        sug.textContent = '';
+        docs.forEach(function (d) { sug.appendChild(el('button', { type: 'button', role: 'option', onclick: function () { kies(d); } }, [d.weergavenaam])); });
+        sug.hidden = !docs.length; adres.setAttribute('aria-expanded', docs.length ? 'true' : 'false');
+      }).catch(sluit);
+    }, 250);
+  });
+  paintBag();
   var contact = el('input', { type: 'text', id: 'contact', placeholder: 'Naam verkoper', autocomplete: 'off' }); contact.value = G.contact;
   contact.addEventListener('input', function () { G.contact = contact.value; save(); });
   var rt = el('textarea', { id: 'redentekst', placeholder: 'Waarom verkopen ze? Typ, of dicteer.' }); rt.value = G.redenTekst || '';
@@ -200,12 +338,12 @@ function vStart(app) {
   var rc = chipGroup(CFG.reden, function (o) { return G.reden.indexOf(o) >= 0; }, function (o) { toggleIn(G.reden, o); save(); });
   app.appendChild(el('div', { class: 'card' }, [
     el('h2', {}, ['Het gesprek']),
-    el('div', {}, [el('label', { for: 'adres' }, ['Adres']), adres]),
+    el('div', { class: 'adresveld' }, [el('label', { for: 'adres' }, ['Adres']), adres, sug]),
+    bagBox,
     el('div', {}, [el('label', { for: 'contact' }, ['Contactpersoon']), contact]),
     el('div', {}, [el('div', { class: 'lbl' }, ['Reden(en) van verkoop']), rc]),
     el('div', {}, [el('label', { for: 'redentekst' }, ['Toelichting']), rt]),
-    dictaat(rt),
-    el('div', { class: 'auto' }, [el('b', {}, ['Hoef je niet te vragen. ']), 'Kadaster, bouwjaar, woonoppervlak, energielabel en WOZ komen uit openbare bronnen. Dat ophalen is nog niet gekoppeld.'])
+    dictaat(rt)
   ]));
 }
 
@@ -220,7 +358,7 @@ function vRondgang(app) {
     picker.appendChild(el('button', { class: 'chip', type: 'button', 'aria-pressed': cur === n ? 'true' : 'false',
       onclick: function () { cur = (cur === n ? '' : n); render(); } }, [n, c]));
   });
-  app.appendChild(el('div', { class: 'card' }, [el('div', { class: 'lbl' }, ['Waar ben je?']), picker, eigen]));
+  app.appendChild(el('div', { class: 'card' }, [el('div', { class: 'lbl' }, ['Waar bent u?']), picker, eigen]));
   if (!cur) return;
 
   var r = room(cur);
@@ -260,7 +398,7 @@ function vRondgang(app) {
     el('div', { class: 'lbl' }, ['Staat']), staat,
     el('label', { for: 'note' }, ['Notitie']), ta,
     dictaat(ta),
-    el('span', { class: 'hint' }, ['Dicteer alleen je eigen notities. Neem het gesprek met de klant niet op zonder toestemming.'])
+    el('span', { class: 'hint' }, ['Dicteer alleen uw eigen notities. Neem het gesprek niet op zonder toestemming.'])
   ]));
 }
 
@@ -300,12 +438,14 @@ function roomList() {
   return names.filter(function (n) { var r = G.rooms[n]; return fotosIn(n).length || (r && (r.note || r.staat)); });
 }
 function payload() {
-  return { versie: 1, bureau: CFG.naam, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
+  return { versie: 2, bureau: kantoor() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
     adres: G.adres || null, contact: G.contact || null,
     verkoper: { reden: G.reden, reden_toelichting: G.redenTekst || null, timing: G.timing || null,
       prijsverwachting: G.prijs || null, prijsbedrag_eur: G.prijsBedrag ? Number(G.prijsBedrag) : null },
     bijzonderheden: G.bijz.map(function (n) { var v = G.aantallen[n]; return { naam: n, aantal: v ? Number(v) : null }; }), opmerkingen: G.opm || null,
     ruimtes: roomList().map(function (n) { var r = G.rooms[n] || {}; return { ruimte: n, staat: r.staat || null, notitie: r.note || null, aantal_fotos: fotosIn(n).length }; }),
+    openbare_bronnen: G.bag ? { bron: 'BAG via PDOK', opgehaald: G.bag.datum, postcode: G.bag.postcode, plaats: G.bag.plaats, gemeente: G.bag.gemeente,
+      bouwjaar: G.bag.bouwjaar, gebruiksoppervlakte_m2: G.bag.oppervlakte, gebruiksdoel: G.bag.gebruiksdoel, lat: G.bag.lat, lon: G.bag.lon } : null,
     op_te_halen: OPHALEN };
 }
 function bijzTekst() {
@@ -371,8 +511,12 @@ function bouwPdf(logo) {
   d.setFillColor(ac[0], ac[1], ac[2]); d.rect(0, 28, W, 0.6, 'F');
   var tx = M;
   if (logo) { var lh = 20, lw = lh * logo.w / logo.h; d.addImage(logo.url, 'PNG', M, 4, lw, lh); tx = M + lw + 5; }
-  d.setTextColor(INK[0], INK[1], INK[2]); d.setFont('helvetica', 'bold'); d.setFontSize(15); d.text(clean(CFG.naam).toUpperCase(), tx, 14);
-  d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(MUT[0], MUT[1], MUT[2]); d.text('OPNAME VERKOOPGESPREK', tx, 20, { charSpace: 0.8 });
+  var kn = kantoor();
+  d.setTextColor(INK[0], INK[1], INK[2]); d.setFont('helvetica', 'bold'); d.setFontSize(15);
+  if (kn) {
+    d.text(clean(kn).toUpperCase(), tx, 14);
+    d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(MUT[0], MUT[1], MUT[2]); d.text('OPNAME VERKOOPGESPREK', tx, 20, { charSpace: 0.8 });
+  } else { d.text('OPNAME VERKOOPGESPREK', tx, 17, { charSpace: 0.8 }); }
   y = 40;
   txt(G.adres || 'Adres onbekend', 20, true, INK, 1);
   txt(datum(G.gemaakt) + (G.contact ? '  |  ' + G.contact : ''), 10, false, MUT, 2);
@@ -384,7 +528,15 @@ function bouwPdf(logo) {
   kv('Prijsverwachting', [G.prijs, G.prijsBedrag ? 'EUR ' + Number(G.prijsBedrag).toLocaleString('nl-NL') : ''].filter(Boolean).join(', '));
   if (G.bijz.length) kv('Bijzonderheden', bijzTekst());
   kv('Opmerkingen', G.opm);
-  kv('Nog op te halen uit openbare bronnen', OPHALEN.join(', '));
+  if (G.bag) {
+    sec('Uit openbare bronnen (BAG)');
+    kv('Postcode en plaats', [G.bag.postcode, G.bag.plaats].filter(Boolean).join(' '));
+    kv('Bouwjaar', G.bag.bouwjaar ? String(G.bag.bouwjaar) : '');
+    kv('Gebruiksoppervlakte', G.bag.oppervlakte ? G.bag.oppervlakte + ' m2' : '');
+    kv('Gebruiksdoel', G.bag.gebruiksdoel);
+    kv('Opgehaald op', G.bag.datum);
+  }
+  kv('Nog zelf op te halen', 'energielabel, WOZ-waarde');
 
   var chain = Promise.resolve();
   roomList().forEach(function (n) {
@@ -407,7 +559,7 @@ function bouwPdf(logo) {
     var n = d.getNumberOfPages();
     for (var i = 1; i <= n; i++) {
       d.setPage(i); d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(MUT[0], MUT[1], MUT[2]);
-      d.text(clean(CFG.naam) + '  |  Rondgang', M, H - 8); d.text(i + ' / ' + n, W - M, H - 8, { align: 'right' });
+      d.text((kantoor() ? clean(kantoor()) + '  |  ' : '') + 'Gemaakt met Rondgang', M, H - 8); d.text(i + ' / ' + n, W - M, H - 8, { align: 'right' });
     }
     return d.output('blob');
   });
@@ -417,6 +569,8 @@ function vRapport(app) {
   var p = payload(), nf = FOTOS.length;
   var dl = el('dl', { class: 'sum' }, [
     el('dt', {}, ['Adres']), el('dd', {}, [p.adres || 'Niet ingevuld']),
+    p.openbare_bronnen && (p.openbare_bronnen.bouwjaar || p.openbare_bronnen.gebruiksoppervlakte_m2) ? el('dt', {}, ['Bouwjaar en oppervlakte']) : null,
+    p.openbare_bronnen && (p.openbare_bronnen.bouwjaar || p.openbare_bronnen.gebruiksoppervlakte_m2) ? el('dd', {}, [[p.openbare_bronnen.bouwjaar, p.openbare_bronnen.gebruiksoppervlakte_m2 ? p.openbare_bronnen.gebruiksoppervlakte_m2 + ' m²' : ''].filter(Boolean).join(', ')]) : null,
     el('dt', {}, ['Reden en timing']), el('dd', {}, [p.verkoper.reden.concat(p.verkoper.timing ? [p.verkoper.timing] : []).join(', ') || 'Niet ingevuld']),
     el('dt', {}, ['Toelichting verkoper']), el('dd', {}, [p.verkoper.reden_toelichting || 'Geen']),
     el('dt', {}, ['Bijzonderheden']), el('dd', {}, [bijzTekst() || 'Geen']),
@@ -424,26 +578,117 @@ function vRapport(app) {
   var status = el('span', { class: 'hint', role: 'status' }, ['']);
   var acties = el('div', { class: 'row' });
   if (gen) {
-    acties.appendChild(el('button', { class: 'btn', type: 'button', id: 'deel', onclick: function () { deel(gen.blob, gen.naam, 'application/pdf'); } }, ['Deel rapport']));
+    acties.appendChild(el('button', { class: 'btn', type: 'button', id: 'deel', onclick: function () { track('rapport_gedeeld'); deel(gen.blob, gen.naam, 'application/pdf'); } }, ['Deel rapport']));
     status.textContent = gen.naam + ' (' + Math.round(gen.blob.size / 1024) + ' kB) staat klaar.';
   }
   acties.appendChild(el('button', { class: gen ? 'btn ghost' : 'btn', type: 'button', id: 'pdf', onclick: function (e) {
     var b = e.currentTarget; b.disabled = true; b.textContent = 'Rapport maken…';
-    saveNow().then(maakPdf).then(function (blob) { gen = { blob: blob, naam: bestandsnaam('pdf') }; render(); })
+    saveNow().then(maakPdf).then(function (blob) { gen = { blob: blob, naam: bestandsnaam('pdf') }; track('rapport_gemaakt'); render(); })
       .catch(function (err) { b.disabled = false; b.textContent = 'Maak rapport'; status.textContent = 'Rapport maken mislukte: ' + (err && err.message || err); });
   } }, [gen ? 'Maak opnieuw' : 'Maak rapport']));
   app.appendChild(el('div', { class: 'card' }, [el('h2', {}, ['Rapport']), dl, acties, status]));
-  app.appendChild(el('div', { class: 'card' }, [
-    el('div', { class: 'lbl' }, ['Gegevens voor de offerte']),
-    el('span', { class: 'hint' }, ['Zonder foto’s. Hiermee maakt de offerte-stap straks zijn voorstel.']),
-    el('button', { class: 'btn ghost', type: 'button', id: 'json', onclick: function () {
-      deel(new Blob([JSON.stringify(payload(), null, 2)], { type: 'application/json' }), bestandsnaam('json'), 'application/json'); } }, ['Deel gegevens (JSON)'])]));
+}
+
+
+/* ---------- menu en info ---------- */
+function prose(secties) {
+  var k = [];
+  secties.forEach(function (x) {
+    k.push(el('h3', {}, [x.k]));
+    x.p.forEach(function (t) { k.push(el('p', {}, [t])); });
+  });
+  return el('div', { class: 'prose' }, k);
+}
+function jsonVan(g) {
+  var oG = G, oF = FOTOS;
+  return fotosVan(g.id).then(function (fs) {
+    G = g; FOTOS = fs;
+    if (typeof G.reden === 'string') G.reden = G.reden ? [G.reden] : [];
+    G.reden = G.reden || []; G.aantallen = G.aantallen || {}; G.bijz = G.bijz || [];
+    try { return JSON.stringify(payload(), null, 2); } finally { G = oG; FOTOS = oF; }
+  });
+}
+function menuPagina(app) {
+  var terug = menu === 'menu' ? '' : 'menu';
+  app.appendChild(el('button', { class: 'back', type: 'button', id: 'terug', onclick: function () { menu = terug; render(); window.scrollTo(0, 0); } }, [menu === 'menu' ? '‹ Terug' : '‹ Menu']));
+  function kop(t) { app.appendChild(el('header', {}, [el('h1', {}, [t])])); }
+  if (menu === 'menu') {
+    kop('Menu');
+    var items = [['over', 'Over Rondgang', 'Wat het is en waarom'], ['instellingen', 'Instellingen', 'Uw kantoornaam in het rapport'],
+      ['export', 'Gegevens exporteren', 'JSON-bestand per gesprek'], ['privacy', 'Privacyverklaring', ''], gaId() ? ['cookies', 'Cookie-instellingen', ''] : null].filter(Boolean);
+    app.appendChild(el('div', { class: 'list' }, items.map(function (i) {
+      return el('button', { class: 'menuitem', type: 'button', id: 'm-' + i[0], onclick: function () { menu = i[0]; render(); window.scrollTo(0, 0); } },
+        [el('span', {}, [el('b', {}, [i[1]]), i[2] ? el('span', { class: 'hint' }, [i[2]]) : null]), icoon(['M9 6l6 6-6 6'])]);
+    })));
+    if (window.RONDGANG_VERSION) app.appendChild(el('div', { class: 'ver' }, ['versie ' + window.RONDGANG_VERSION]));
+  } else if (menu === 'over') {
+    kop('Over Rondgang');
+    var T = window.RG_TEKST.over;
+    app.appendChild(el('div', { class: 'card' }, [prose(T.slice(0, 2))]));
+    app.appendChild(el('div', { class: 'card' }, [prose(T.slice(2))]));
+    var mailStatus = el('span', { class: 'hint', role: 'status' }, ['']);
+    app.appendChild(el('div', { class: 'card' }, [
+      el('h2', {}, ['Gebruikt u Rondgang?']),
+      el('p', {}, ['Vindt u het leuk en handig? Stuur dan een mail en laat weten dat u het gebruikt. Dat is fijn om te weten, en uw ideeën zijn welkom.']),
+      el('p', { class: 'mailadres' }, [MAIL]),
+      el('div', { class: 'row' }, [
+        el('a', { class: 'btn', id: 'mail', href: 'mailto:' + MAIL + '?subject=' + encodeURIComponent('Ik gebruik Rondgang'), onclick: function () { track('mail_klik', { locatie: 'over' }); } }, ['Stuur een mail']),
+        el('button', { class: 'btn ghost', type: 'button', id: 'kopieer', onclick: function () {
+          track('mail_klik', { locatie: 'kopieer' });
+          var ok = function () { mailStatus.textContent = 'Adres gekopieerd.'; }, nee = function () { mailStatus.textContent = 'Kopiëren lukte niet. Selecteer het adres hierboven.'; };
+          try { navigator.clipboard.writeText(MAIL).then(ok, nee); } catch (e) { nee(); }
+        } }, ['Kopieer adres'])]),
+      mailStatus]));
+    app.appendChild(el('div', { class: 'card' }, [
+      el('h2', {}, ['Wie maakt dit']),
+      el('p', {}, ['Rondgang is gemaakt door Rogier Gerritsma, makelaar in Abcoude. De code is open en staat op GitHub.']),
+      el('a', { class: 'btn ghost', href: REPO, target: '_blank', rel: 'noopener' }, ['Bekijk de code'])]));
+  } else if (menu === 'instellingen') {
+    kop('Instellingen');
+    var kn = el('input', { type: 'text', id: 'kantoor', placeholder: 'Bijvoorbeeld uw kantoornaam', autocomplete: 'organization' }); kn.value = lsGet('rg_kantoor') || '';
+    kn.addEventListener('input', function () { lsSet('rg_kantoor', kn.value); gen = null; });
+    app.appendChild(el('div', { class: 'card' }, [
+      el('label', { for: 'kantoor' }, ['Naam in het rapport']), kn,
+      el('span', { class: 'hint' }, ['Staat in de kop van uw PDF-rapport. Laat leeg als u dit niet wilt. Deze naam blijft op uw toestel.'])]));
+  } else if (menu === 'export') {
+    kop('Gegevens exporteren');
+    var box = el('div', { class: 'list' });
+    app.appendChild(el('div', { class: 'card' }, [
+      el('p', {}, ['Een JSON-bestand met de ingevulde gegevens van een gesprek, zonder foto’s. Handig als u de gegevens in een ander systeem wilt gebruiken, bijvoorbeeld voor uw offerte.']), box]));
+    allOf('gesprekken').then(function (a) {
+      a.sort(function (x, y) { return y.bijgewerkt - x.bijgewerkt; });
+      if (!a.length) { box.appendChild(el('p', { class: 'hint' }, ['Nog geen gesprekken.'])); return; }
+      a.forEach(function (g) {
+        box.appendChild(el('div', { class: 'item' }, [
+          el('div', { class: 'open static' }, [el('b', {}, [g.adres || 'Zonder adres']), el('span', { class: 'hint' }, [datum(g.bijgewerkt)])]),
+          el('button', { class: 'btn small ghost', type: 'button', onclick: function () {
+            track('json_gedeeld');
+            jsonVan(g).then(function (t) { var tmp = G; G = g; var nm = bestandsnaam('json'); G = tmp; return deel(new Blob([t], { type: 'application/json' }), nm, 'application/json'); });
+          } }, ['Deel JSON'])]));
+      });
+    });
+  } else if (menu === 'privacy') {
+    kop('Privacyverklaring');
+    app.appendChild(el('div', { class: 'card' }, [prose(window.RG_TEKST.privacy), el('span', { class: 'hint' }, ['Versie van ' + window.RG_TEKST.versie + '.'])]));
+  } else if (menu === 'cookies') {
+    kop('Cookie-instellingen');
+    var k = keuze();
+    app.appendChild(el('div', { class: 'card' }, [
+      el('p', {}, ['Rondgang meet met Google Analytics hoe de app wordt gebruikt, alleen als u dat goed vindt. We meten nooit wat u invult.']),
+      el('p', {}, [el('b', {}, ['Uw keuze nu: ']), k === 'ja' ? 'meten staat aan' : k === 'nee' ? 'meten staat uit' : 'nog geen keuze']),
+      el('div', { class: 'row' }, [
+        el('button', { class: 'btn', type: 'button', id: 'ck-ja', onclick: function () { zetKeuze('ja'); } }, ['Prima']),
+        el('button', { class: 'btn', type: 'button', id: 'ck-nee', onclick: function () { zetKeuze('nee'); } }, ['Liever niet'])]),
+      el('button', { class: 'btn ghost', type: 'button', id: 'ck-wis', onclick: function () { zetKeuze(null); } }, ['Mijn cookiekeuze wissen'])]));
+  }
 }
 
 function render() {
   if (stopDictaat) stopDictaat();
   var app = $('#app'), nav = $('#nav'); app.textContent = ''; nav.textContent = ''; chipEls = {};
-  nav.hidden = !G;
+  nav.hidden = !G || !!menu;
+  paintCookie();
+  if (menu) { menuPagina(app); return; }
   if (!G) { home(app); return; }
   gesprekKop(app);
   ({ start: vStart, rondgang: vRondgang, afronden: vAfronden, rapport: vRapport })[tab](app);
@@ -474,11 +719,11 @@ window.addEventListener('pagehide', function () { saveNow(); });
 document.addEventListener('visibilitychange', function () { if (document.hidden) saveNow(); });
 
 Promise.all([laadConfig(), openDB()]).then(function (r) {
-  DB = r[1]; pasToe();
+  DB = r[1]; pasToe(); laadGA();
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(function () {});
   render();
-  if (!DB) $('#app').insertBefore(el('div', { class: 'warn' }, ['Opslaan op dit toestel is niet beschikbaar (privévenster?). Gesprekken verdwijnen als je de pagina sluit.']), $('#app').firstChild);
+  if (!DB) $('#app').insertBefore(el('div', { class: 'warn' }, ['Opslaan op dit toestel is niet beschikbaar (privévenster?). Gesprekken verdwijnen als u de pagina sluit.']), $('#app').firstChild);
 });
 window.__rondgang = { get G() { return G; }, get CFG() { return CFG; } };
 })();

@@ -21,7 +21,9 @@ index = '''<!doctype html>
 </head><body>
 <div class="wrap" id="app"></div>
 <nav id="nav" hidden></nav>
+<div id="cookie" role="region" aria-label="Cookies" hidden></div>
 <script src="version.js"></script>
+<script src="teksten.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="app.js"></script>
 </body></html>

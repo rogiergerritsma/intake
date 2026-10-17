@@ -1,6 +1,5 @@
 {
-  "naam": "Bureau Wonen",
-  "plaats": "Abcoude",
+  "naam": "",
   "accent": "#B47070",
   "ruimtes": [
     "Entree",
@@ -56,5 +55,8 @@
     "Funderingsissue",
     "Vochtplekken"
   ],
-  "logo": "logo.png"
+  "logo": "logo.png",
+  "analytics": {
+    "ga": ""
+  }
 }
