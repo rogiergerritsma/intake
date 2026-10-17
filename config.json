@@ -57,6 +57,50 @@
   ],
   "logo": "logo.png",
   "analytics": {
-    "ga": ""
+    "ga": "GT-PZM42SW8"
+  },
+  "woningtypes": {
+    "Woonhuis": {
+      "soort": [
+        "Bungalow",
+        "Eengezinswoning",
+        "Grachtenpand",
+        "Herenhuis",
+        "Landhuis",
+        "Stacaravan",
+        "Villa",
+        "Woonboerderij",
+        "Woonboot",
+        "Woonwagen"
+      ],
+      "bouwvorm": [
+        "Eind",
+        "Geschakeld",
+        "Geschakelde twee onder een kap",
+        "Half vrijstaand",
+        "Hoek",
+        "Tussen",
+        "Twee onder een kap",
+        "Verspringend",
+        "Vrijstaand"
+      ]
+    },
+    "Appartement": {
+      "soort": [
+        "Benedenwoning",
+        "Bovenwoning",
+        "Dubbel benedenhuis",
+        "Dubbel bovenhuis",
+        "Galerijflat",
+        "Maisonnette",
+        "Penthouse",
+        "Portiekflat",
+        "Portiekwoning"
+      ],
+      "bouwvorm": []
+    },
+    "Parkeergelegenheid": {},
+    "Bouwgrond": {},
+    "Overig": {}
   }
 }

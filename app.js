@@ -6,6 +6,7 @@ var FALLBACK = {
   ruimtes: ['Entree', 'Woonkamer', 'Keuken', 'Slaapkamer', 'Badkamer', 'Toilet', 'Zolder', 'Garage', 'Achtertuin', 'Voorgevel'],
   staat: ['Goed', 'Redelijk', 'Verouderd'],
   reden: ['Groter', 'Kleiner', 'Verhuizing werk', 'Scheiding', 'Erfenis', 'Senior', 'Anders'],
+  woningtypes: { Woonhuis: { soort: ['Eengezinswoning', 'Villa'], bouwvorm: ['Tussen', 'Hoek', 'Vrijstaand'] }, Appartement: { soort: ['Benedenwoning', 'Bovenwoning'], bouwvorm: [] }, Parkeergelegenheid: {}, Bouwgrond: {}, Overig: {} },
   timing: ['Zo snel mogelijk', 'Binnen 3 maanden', 'Na de zomer', 'Geen haast'],
   prijs: ['Dichtbij marktwaarde', 'Hoger verwacht', 'Onzeker'],
   bijzonderheden: [{ naam: 'Zonnepanelen', aantal: 'panelen' }, 'Overpad of recht van weg', 'Verbouwd', 'Erfpacht', 'VvE', 'Vochtplekken']
@@ -53,7 +54,7 @@ function laadGA() {
   window.__gaLoaded = 1; window.dataLayer = window.dataLayer || [];
   window.gtag = function () { window.dataLayer.push(arguments); };
   window.gtag('js', new Date());
-  window.gtag('config', gaId(), { allow_google_signals: false, allow_ad_personalization_signals: false });
+  window.gtag('config', gaId(), { allow_google_signals: false, allow_ad_personalization_signals: false, content_group: 'rondgang' });
   document.head.appendChild(el('script', { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId()) }));
 }
 /* Alleen gebruik van de app, nooit wat er is ingevuld. */
@@ -121,7 +122,10 @@ function saveNow() { clearTimeout(saveT); if (G) { G.bijgewerkt = Date.now(); re
 
 function nieuw() {
   return { id: uid(), gemaakt: Date.now(), bijgewerkt: Date.now(), adres: '', contact: '', reden: [], redenTekst: '', aantallen: {},
-    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null, fundering: '', energielabel: '' };
+    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null, fundering: '', energielabel: '', woning: nieuwWoning() };
+}
+function nieuwWoning() {
+  return { hoofd: '', soort: '', bouwvorm: '', nieuwbouw: false, aanbouw: false, verdiepingen: '', oprit: '', voortuin: '', parkeren: [] };
 }
 function bn(b) { return typeof b === 'string' ? b : b.naam; }
 function bAantal(b) { return typeof b === 'object' && b.aantal ? b.aantal : ''; }
@@ -279,6 +283,7 @@ function openGesprek(g) {
   if (typeof G.reden === 'string') G.reden = G.reden ? [G.reden] : [];
   if (!G.reden) G.reden = [];
   if (!G.aantallen) G.aantallen = {};
+  if (!G.woning) G.woning = nieuwWoning();
   fotosVan(g.id).then(function (fs) { FOTOS = fs; render(); });
 }
 
@@ -348,6 +353,38 @@ function vStart(app) {
     el('div', {}, [el('label', { for: 'redentekst' }, ['Toelichting']), rt]),
     dictaat(rt)
   ]));
+  var W = G.woning, typeBox = el('div', { class: 'stack', id: 'woningtype' });
+  function jaNee(sleutel, titel) {
+    return el('div', {}, [el('div', { class: 'lbl' }, [titel]),
+      chipGroup(['Ja', 'Nee'], function (o) { return W[sleutel] === o; }, function (o) { W[sleutel] = (W[sleutel] === o ? '' : o); save(); })]);
+  }
+  function paintType() {
+    typeBox.textContent = '';
+    var T = CFG.woningtypes || {}, sub = T[W.hoofd] || {};
+    typeBox.appendChild(el('div', {}, [el('div', { class: 'lbl' }, ['Soort object']),
+      chipGroup(Object.keys(T), function (o) { return W.hoofd === o; }, function (o) {
+        if (W.hoofd === o) W.hoofd = ''; else { W.hoofd = o; }
+        W.soort = ''; W.bouwvorm = ''; save(); paintType(); })]));
+    if (sub.soort && sub.soort.length) typeBox.appendChild(el('div', {}, [el('div', { class: 'lbl' }, ['Soort ' + W.hoofd.toLowerCase()]),
+      chipGroup(sub.soort, function (o) { return W.soort === o; }, function (o) { W.soort = (W.soort === o ? '' : o); save(); })]));
+    if (sub.bouwvorm && sub.bouwvorm.length) typeBox.appendChild(el('div', {}, [el('div', { class: 'lbl' }, ['Bouwvorm']),
+      chipGroup(sub.bouwvorm, function (o) { return W.bouwvorm === o; }, function (o) { W.bouwvorm = (W.bouwvorm === o ? '' : o); save(); })]));
+    typeBox.appendChild(el('div', {}, [el('div', { class: 'lbl' }, ['Status']),
+      chipGroup(['Nieuwbouw', 'In aanbouw'], function (o) { return o === 'Nieuwbouw' ? W.nieuwbouw : W.aanbouw; }, function (o) {
+        if (o === 'Nieuwbouw') W.nieuwbouw = !W.nieuwbouw; else W.aanbouw = !W.aanbouw; save(); })]));
+  }
+  paintType();
+  app.appendChild(el('div', { class: 'card' }, [
+    el('h2', {}, ['Type woning']),
+    typeBox,
+    el('div', {}, [el('div', { class: 'lbl' }, ['Aantal verdiepingen']),
+      chipGroup(['1', '2', '3', '4', '5 of meer'], function (o) { return W.verdiepingen === o; }, function (o) { W.verdiepingen = (W.verdiepingen === o ? '' : o); save(); })]),
+    jaNee('oprit', 'Oprit'),
+    jaNee('voortuin', 'Voortuin'),
+    el('div', {}, [el('div', { class: 'lbl' }, ['Parkeren']),
+      chipGroup(['Openbaar', 'Eigen terrein'], function (o) { return W.parkeren.indexOf(o) >= 0; }, function (o) { toggleIn(W.parkeren, o); save(); })]),
+    el('span', { class: 'hint' }, ['Dezelfde indeling als in Kolibri en Funda.'])
+  ]));
   var fundBox = el('div', { class: 'warn', id: 'fundwarn', hidden: '' });
   function paintFund() {
     var k = G.fundering; fundBox.textContent = '';
@@ -361,7 +398,7 @@ function vStart(app) {
   var fk = chipGroup(['A', 'B', 'C', 'D', 'E', 'Onbekend'], function (o) { return G.fundering === o; }, function (o) { G.fundering = (G.fundering === o ? '' : o); save(); paintFund(); });
   var el2 = chipGroup(LABELS, function (o) { return G.energielabel === o; }, function (o) { G.energielabel = (G.energielabel === o ? '' : o); save(); });
   app.appendChild(el('div', { class: 'card' }, [
-    el('h2', {}, ['De woning']),
+    el('h2', {}, ['Fundering en energie']),
     el('div', {}, [el('div', { class: 'lbl' }, ['Funderingsrisicoklasse']), fk]),
     el('span', { class: 'hint' }, ['A geen risico, B licht, C verhoogd of onzeker, D hoog, E vastgesteld probleem. Staat in het KCAF-rapport, het taxatierapport of de advertentie.']),
     fundBox,
@@ -462,16 +499,22 @@ function roomList() {
   return names.filter(function (n) { var r = G.rooms[n]; return fotosIn(n).length || (r && (r.note || r.staat)); });
 }
 function payload() {
-  return { versie: 3, bureau: kantoor() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
+  return { versie: 4, bureau: kantoor() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
     adres: G.adres || null, contact: G.contact || null,
     verkoper: { reden: G.reden, reden_toelichting: G.redenTekst || null, timing: G.timing || null,
       prijsverwachting: G.prijs || null, prijsbedrag_eur: G.prijsBedrag ? Number(G.prijsBedrag) : null },
     bijzonderheden: G.bijz.map(function (n) { var v = G.aantallen[n]; return { naam: n, aantal: v ? Number(v) : null }; }), opmerkingen: G.opm || null,
     ruimtes: roomList().map(function (n) { var r = G.rooms[n] || {}; return { ruimte: n, staat: r.staat || null, notitie: r.note || null, aantal_fotos: fotosIn(n).length }; }),
+    woning: { soort_object: G.woning.hoofd || null, soort: G.woning.soort || null, bouwvorm: G.woning.bouwvorm || null, nieuwbouw: G.woning.nieuwbouw, in_aanbouw: G.woning.aanbouw,
+      verdiepingen: G.woning.verdiepingen || null, oprit: G.woning.oprit || null, voortuin: G.woning.voortuin || null, parkeren: G.woning.parkeren },
     fundering: G.fundering ? { klasse: G.fundering, toelichting: FUNDERING[G.fundering] || null } : null, energielabel: G.energielabel || null,
     openbare_bronnen: G.bag ? { bron: 'BAG via PDOK', opgehaald: G.bag.datum, postcode: G.bag.postcode, plaats: G.bag.plaats, gemeente: G.bag.gemeente,
       bouwjaar: G.bag.bouwjaar, gebruiksoppervlakte_m2: G.bag.oppervlakte, gebruiksdoel: G.bag.gebruiksdoel, lat: G.bag.lat, lon: G.bag.lon } : null,
     op_te_halen: OPHALEN };
+}
+function typeTekst() {
+  var W = G.woning || {};
+  return [W.hoofd, W.soort, W.bouwvorm].filter(Boolean).join(', ') + (W.nieuwbouw ? ', nieuwbouw' : '') + (W.aanbouw ? ', in aanbouw' : '');
 }
 function bijzTekst() {
   return G.bijz.map(function (n) {
@@ -562,6 +605,11 @@ function bouwPdf(logo) {
     kv('Opgehaald op', G.bag.datum);
   }
   sec('Woning');
+  kv('Type', typeTekst().replace(/^, /, ''));
+  kv('Aantal verdiepingen', G.woning.verdiepingen);
+  kv('Oprit', G.woning.oprit);
+  kv('Voortuin', G.woning.voortuin);
+  kv('Parkeren', G.woning.parkeren.join(' en ').toLowerCase());
   kv('Funderingsrisicoklasse', G.fundering ? G.fundering + (FUNDERING[G.fundering] ? ' (' + FUNDERING[G.fundering] + ')' : '') : '');
   if (G.fundering === 'D' || G.fundering === 'E') kv('Aandachtspunt', 'Bij deze klasse volgt in principe aanvullend funderingsonderzoek. Zie ' + FUNDAMENT.replace('https://', '').replace(/\/$/, '') + ' voor regie over het funderingsdossier.');
   kv('Energielabel', G.energielabel);
@@ -600,6 +648,7 @@ function vRapport(app) {
     el('dt', {}, ['Adres']), el('dd', {}, [p.adres || 'Niet ingevuld']),
     p.openbare_bronnen && (p.openbare_bronnen.bouwjaar || p.openbare_bronnen.gebruiksoppervlakte_m2) ? el('dt', {}, ['Bouwjaar en oppervlakte']) : null,
     p.openbare_bronnen && (p.openbare_bronnen.bouwjaar || p.openbare_bronnen.gebruiksoppervlakte_m2) ? el('dd', {}, [[p.openbare_bronnen.bouwjaar, p.openbare_bronnen.gebruiksoppervlakte_m2 ? p.openbare_bronnen.gebruiksoppervlakte_m2 + ' m²' : ''].filter(Boolean).join(', ')]) : null,
+    typeTekst() ? el('dt', {}, ['Type woning']) : null, typeTekst() ? el('dd', {}, [typeTekst().replace(/^, /, '')]) : null,
     G.fundering ? el('dt', {}, ['Fundering']) : null, G.fundering ? el('dd', {}, ['Klasse ' + G.fundering + (FUNDERING[G.fundering] ? ', ' + FUNDERING[G.fundering] : '')]) : null,
     el('dt', {}, ['Reden en timing']), el('dd', {}, [p.verkoper.reden.concat(p.verkoper.timing ? [p.verkoper.timing] : []).join(', ') || 'Niet ingevuld']),
     el('dt', {}, ['Toelichting verkoper']), el('dd', {}, [p.verkoper.reden_toelichting || 'Geen']),
@@ -634,7 +683,7 @@ function jsonVan(g) {
   return fotosVan(g.id).then(function (fs) {
     G = g; FOTOS = fs;
     if (typeof G.reden === 'string') G.reden = G.reden ? [G.reden] : [];
-    G.reden = G.reden || []; G.aantallen = G.aantallen || {}; G.bijz = G.bijz || [];
+    G.reden = G.reden || []; G.aantallen = G.aantallen || {}; G.bijz = G.bijz || []; G.woning = G.woning || nieuwWoning();
     try { return JSON.stringify(payload(), null, 2); } finally { G = oG; FOTOS = oF; }
   });
 }
