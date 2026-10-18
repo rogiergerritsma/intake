@@ -130,3 +130,4 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 }
 @media (min-width:900px) and (hover:none){ .chip{min-height:56px} }
 .hint.aangepast{color:var(--accent,#B47070)}
+.foot.sites{margin-top:-6px}

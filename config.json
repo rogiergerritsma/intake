@@ -90,15 +90,17 @@
     },
     "Appartement": {
       "soort": [
-        "Benedenwoning",
         "Bovenwoning",
-        "Dubbel benedenhuis",
-        "Dubbel bovenhuis",
-        "Galerijflat",
+        "Benedenwoning",
         "Maisonnette",
-        "Penthouse",
+        "Galerijflat",
         "Portiekflat",
-        "Portiekwoning"
+        "Beneden/Bovenwoning",
+        "Penthouse",
+        "Portiekwoning",
+        "Studenten kamer",
+        "Dubbel benedenhuis",
+        "Tussenverdieping"
       ],
       "bouwvorm": []
     },

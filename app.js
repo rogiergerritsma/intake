@@ -266,13 +266,17 @@ function home(app) {
   app.appendChild(el('div', { class: 'card intro' }, [
     el('h2', {}, ['Snel vastleggen tijdens het verkoopgesprek']),
     el('p', {}, ['Foto’s, notities en dictaat per ruimte, plus de wensen van de verkoper. Daarna maakt u een PDF-rapport waarmee u een goede offerte maakt, omdat u precies weet hoe het huis was.']),
-    el('p', { class: 'hint' }, ['Gratis. Alles blijft op uw toestel. ', el('button', { class: 'link', type: 'button', onclick: function () { menu = 'over'; render(); window.scrollTo(0, 0); } }, ['Meer over Rondgang'])])]));
+    el('p', { class: 'hint' }, ['Gratis. Alles blijft op uw toestel. ', el('button', { class: 'link', type: 'button', onclick: function () { menu = 'over'; render(); window.scrollTo(0, 0); } }, ['Meer over Intake'])])]));
   app.appendChild(el('button', { class: 'btn', type: 'button', id: 'nieuw', onclick: function () { G = nieuw(); FOTOS = []; tab = 'start'; cur = ''; gen = null; put('gesprekken', G); track('gesprek_gestart'); render(); } }, ['Nieuw gesprek']));
   var lijst = el('div', { class: 'list', id: 'lijst' });
   app.appendChild(lijst);
   app.appendChild(el('div', { class: 'foot' }, [
     el('button', { class: 'link', type: 'button', onclick: function () { menu = 'privacy'; render(); window.scrollTo(0, 0); } }, ['Privacyverklaring']),
     gaId() ? el('button', { class: 'link', type: 'button', onclick: function () { menu = 'cookies'; render(); window.scrollTo(0, 0); } }, ['Cookie-instellingen']) : null]));
+  app.appendChild(el('div', { class: 'foot sites' }, [
+    el('a', { class: 'link', href: 'https://bureau-wonen.nl', target: '_blank', rel: 'noopener' }, ['Bureau Wonen']),
+    el('a', { class: 'link', href: 'https://bureaugerritsma.nl', target: '_blank', rel: 'noopener' }, ['Bureau Gerritsma']),
+    el('a', { class: 'link', href: FUNDAMENT, target: '_blank', rel: 'noopener', onclick: function () { track('fundament_klik', { locatie: 'footer' }); } }, ['Bureau Fundament'])]));
   if (window.RONDGANG_VERSION) app.appendChild(el('div', { class: 'ver' }, ['versie ' + window.RONDGANG_VERSION]));
   allOf('gesprekken').then(function (a) {
     a.sort(function (x, y) { return y.bijgewerkt - x.bijgewerkt; });
@@ -717,6 +721,10 @@ function vRapport(app) {
   var status = el('span', { class: 'hint', role: 'status' }, ['']);
   var acties = el('div', { class: 'row' });
   if (gen) {
+    acties.appendChild(el('button', { class: 'btn ghost', type: 'button', id: 'bekijk', onclick: function () {
+      var u = URL.createObjectURL(gen.blob), w = window.open(u, '_blank');
+      if (!w) location.href = u;
+      setTimeout(function () { URL.revokeObjectURL(u); }, 120000); } }, ['Bekijk rapport']));
     acties.appendChild(el('button', { class: 'btn', type: 'button', id: 'deel', onclick: function () { track('rapport_gedeeld'); deel(gen.blob, gen.naam, 'application/pdf'); } }, ['Deel rapport']));
     status.textContent = gen.naam + ' (' + Math.round(gen.blob.size / 1024) + ' kB) staat klaar.';
   }
