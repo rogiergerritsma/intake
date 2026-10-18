@@ -180,5 +180,6 @@
       "Zonneboiler",
       "Stadsverwarming"
     ]
-  }
+  },
+  "energielabel_api": "https://intake-energielabel.rogier-5cd.workers.dev/label"
 }

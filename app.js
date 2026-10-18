@@ -138,6 +138,19 @@ function maatTekst(key, eenheid) {
   return t + ' (BAG)';
 }
 function maatJson(key) { var m = maatInfo(key); return m.waarde ? { waarde: m.waarde, bron: m.bron, bag_waarde: m.bag } : null; }
+function elInfo() {
+  var w = G.energielabel || '', ep = G.elEP && G.elEP.label ? G.elEP.label : null;
+  return { waarde: w, ep: ep, geen: !!(G.elEP && G.elEP.label === null), geldig: G.elEP && G.elEP.geldig_tot ? G.elEP.geldig_tot.slice(0, 10) : '',
+    bron: !w ? null : (ep ? (ep === w ? 'ep' : 'aangepast') : 'handmatig') };
+}
+function nlDatum(iso) { return iso ? iso.slice(8, 10) + '-' + iso.slice(5, 7) + '-' + iso.slice(0, 4) : ''; }
+function elTekst() {
+  var e = elInfo(); if (!e.waarde) return '';
+  if (e.bron === 'ep') return e.waarde + ' (EP-Online' + (e.geldig ? ', geldig tot ' + nlDatum(e.geldig) : '') + ')';
+  if (e.bron === 'aangepast') return e.waarde + ' (aangepast door makelaar, EP-Online: ' + e.ep + ')';
+  return e.waarde + (e.geen ? ' (handmatig gekozen, geen label gevonden in EP-Online)' : ' (handmatig gekozen)');
+}
+var elBusy = false;
 function nieuwInstall() { return { verwarming: [], afgifte: [], warmwater: [], ketelBouwjaar: '' }; }
 function nieuwWoning() {
   return { hoofd: '', soort: '', bouwvorm: '', nieuwbouw: false, aanbouw: false, verdiepingen: '', oprit: '', parkeren: [] };
@@ -179,7 +192,7 @@ function haalBag(sug) {
   return jget(PDOK + 'lookup?id=' + encodeURIComponent(sug.id) + '&fl=' + fl).then(function (j) {
     var d = j.response && j.response.docs && j.response.docs[0];
     if (!d) throw new Error('geen adres');
-    var out = { adres: d.weergavenaam, postcode: d.postcode || null, plaats: d.woonplaatsnaam || null, gemeente: d.gemeentenaam || null,
+    var out = { bagId: d.adresseerbaarobject_id || null, adres: d.weergavenaam, postcode: d.postcode || null, plaats: d.woonplaatsnaam || null, gemeente: d.gemeentenaam || null,
       lat: null, lon: null, bouwjaar: null, oppervlakte: null, gebruiksdoel: null, datum: new Date().toISOString().slice(0, 10) };
     var m = /POINT\(([-\d.]+) ([-\d.]+)\)/.exec(d.centroide_ll || '');
     if (m) { out.lon = Number(m[1]); out.lat = Number(m[2]); }
@@ -356,11 +369,22 @@ function vStart(app) {
     bagBox.appendChild(dl);
     bagBox.appendChild(el('span', { class: 'hint' }, ['Controleer dit zelf. Bouwjaar en oppervlakte kunt u hieronder aanpassen. Energielabel en WOZ-waarde haalt u nog zelf op.']));
   }
+  function haalLabel(b, my) {
+    if (!CFG.energielabel_api || !b.bagId) return;
+    elBusy = true; if (window.__paintEL) window.__paintEL();
+    jget(CFG.energielabel_api + '?bag=' + encodeURIComponent(b.bagId)).then(function (j) {
+      if (my !== bagTok || !G) return;
+      elBusy = false;
+      G.elEP = { label: j && j.label ? j.label : null, geldig_tot: j && j.geldig_tot || null, datum: new Date().toISOString().slice(0, 10) };
+      if (G.elEP.label && !G.energielabel && LABELS.indexOf(G.elEP.label) >= 0) G.energielabel = G.elEP.label;
+      save(); if (window.__paintEL) window.__paintEL();
+    }).catch(function () { if (my !== bagTok) return; elBusy = false; if (window.__paintEL) window.__paintEL(); });
+  }
   function kies(d) {
-    sluit(); adres.value = d.weergavenaam; G.adres = d.weergavenaam; G.bag = null; G.gebouw = { bouwjaar: '', oppervlakte: '' }; bagMsg = 'Gegevens ophalen…'; paintBag(); paintMaat();
+    sluit(); adres.value = d.weergavenaam; G.adres = d.weergavenaam; G.bag = null; G.elEP = null; G.energielabel = ''; elBusy = false; if (window.__paintEL) window.__paintEL(); G.gebouw = { bouwjaar: '', oppervlakte: '' }; bagMsg = 'Gegevens ophalen…'; paintBag(); paintMaat();
     var sub = document.getElementById('adres-sub'); if (sub) sub.textContent = G.adres;
     var my = ++bagTok; save(); track('adres_gekozen');
-    haalBag(d).then(function (b) { if (my !== bagTok || !G) return; G.bag = b; G.gebouw = { bouwjaar: b.bouwjaar ? String(b.bouwjaar) : '', oppervlakte: b.oppervlakte ? String(b.oppervlakte) : '' }; bagMsg = ''; save(); paintBag(); paintMaat(); })
+    haalBag(d).then(function (b) { if (my !== bagTok || !G) return; G.bag = b; G.gebouw = { bouwjaar: b.bouwjaar ? String(b.bouwjaar) : '', oppervlakte: b.oppervlakte ? String(b.oppervlakte) : '' }; bagMsg = ''; save(); paintBag(); paintMaat(); haalLabel(b, my); })
       .catch(function () { if (my !== bagTok) return; bagMsg = 'Ophalen lukte niet. U kunt het adres gewoon zelf invullen.'; paintBag(); });
   }
   adres.addEventListener('input', function () {
@@ -437,16 +461,30 @@ function vStart(app) {
     fundBox.appendChild(el('a', { class: 'link', id: 'fundlink', href: FUNDAMENT, target: '_blank', rel: 'noopener', onclick: function () { track('fundament_klik', { locatie: 'klasse_' + k }); } }, ['bureau-fundament.nl']));
   }
   var fk = chipGroup(['A', 'B', 'C', 'D', 'E', 'Onbekend'], function (o) { return G.fundering === o; }, function (o) { G.fundering = (G.fundering === o ? '' : o); save(); paintFund(); });
-  var el2 = chipGroup(LABELS, function (o) { return G.energielabel === o; }, function (o) { G.energielabel = (G.energielabel === o ? '' : o); save(); });
+  var elWrap = el('div', { id: 'elwrap' }), elSt = el('span', { class: 'hint', role: 'status', id: 'elstatus' });
+  function paintEL() {
+    elWrap.textContent = '';
+    elWrap.appendChild(chipGroup(LABELS, function (o) { return G.energielabel === o; }, function (o) { G.energielabel = (G.energielabel === o ? '' : o); save(); paintEL(); }));
+    var e = elInfo(); elSt.textContent = ''; elSt.className = 'hint' + (e.bron === 'aangepast' ? ' aangepast' : '');
+    if (elBusy) elSt.textContent = 'Energielabel opzoeken in EP-Online…';
+    else if (e.bron === 'ep') elSt.textContent = 'Uit EP-Online (RVO)' + (e.geldig ? ', geldig tot ' + nlDatum(e.geldig) : '') + '. Pas aan als dit niet klopt.';
+    else if (e.bron === 'aangepast') {
+      elSt.appendChild(document.createTextNode('Aangepast door u. EP-Online: ' + e.ep + '. Dit staat zo in het rapport. '));
+      elSt.appendChild(el('button', { class: 'link', type: 'button', onclick: function () { G.energielabel = e.ep; save(); paintEL(); } }, ['Terug naar EP-Online']));
+    } else if (e.geen) elSt.textContent = 'Geen label gevonden in EP-Online. Kies het label zelf, als u het weet.';
+    else if (e.bron === 'handmatig') elSt.textContent = 'Handmatig gekozen.';
+    else elSt.textContent = 'Kies een adres, dan zoekt Intake het label op. U kunt het ook zelf kiezen.';
+  }
+  window.__paintEL = paintEL;
   app.appendChild(el('div', { class: 'card' }, [
     el('h2', {}, ['Fundering en energie']),
     el('div', {}, [el('div', { class: 'lbl' }, ['Funderingsrisicoklasse']), fk]),
     el('span', { class: 'hint' }, ['A geen risico, B licht, C verhoogd of onzeker, D hoog, E vastgesteld probleem. Staat in het KCAF-rapport, het taxatierapport of de advertentie.']),
     fundBox,
-    el('div', {}, [el('div', { class: 'lbl' }, ['Energielabel']), el2]),
-    el('span', { class: 'hint' }, ['Voorlopig vult u dit zelf in. Later haalt Intake het automatisch op.'])
+    el('div', {}, [el('div', { class: 'lbl' }, ['Energielabel']), elWrap]),
+    elSt
   ]));
-  paintFund();
+  paintFund(); paintEL();
   var I = G.install, IC = CFG.installaties || {};
   function ig(titel, key) { return el('div', {}, [el('div', { class: 'lbl' }, [titel]),
     chipGroup(IC[key] || [], function (o) { return I[key].indexOf(o) >= 0; }, function (o) { toggleIn(I[key], o); save(); })]); }
@@ -565,7 +603,7 @@ function payload() {
     woning: { soort_object: G.woning.hoofd || null, soort: G.woning.soort || null, bouwvorm: G.woning.bouwvorm || null, nieuwbouw: G.woning.nieuwbouw, in_aanbouw: G.woning.aanbouw,
       verdiepingen: G.woning.verdiepingen || null, oprit: G.woning.oprit || null, parkeren: G.woning.parkeren },
     installaties: { verwarming: G.install.verwarming, afgifte: G.install.afgifte, warm_water: G.install.warmwater, bouwjaar_installatie: G.install.ketelBouwjaar ? Number(G.install.ketelBouwjaar) : null },
-    fundering: G.fundering ? { klasse: G.fundering, toelichting: FUNDERING[G.fundering] || null } : null, energielabel: G.energielabel || null,
+    fundering: G.fundering ? { klasse: G.fundering, toelichting: FUNDERING[G.fundering] || null } : null, energielabel: G.energielabel ? { waarde: G.energielabel, bron: elInfo().bron, ep_online: G.elEP ? { label: G.elEP.label, geldig_tot: G.elEP.geldig_tot, opgehaald: G.elEP.datum } : null } : null,
     gebouw: { bouwjaar: maatJson('bouwjaar'), gebruiksoppervlakte_m2: maatJson('oppervlakte') },
     openbare_bronnen: G.bag ? { bron: 'BAG via PDOK', opgehaald: G.bag.datum, postcode: G.bag.postcode, plaats: G.bag.plaats, gemeente: G.bag.gemeente,
       bouwjaar: G.bag.bouwjaar, gebruiksoppervlakte_m2: G.bag.oppervlakte, gebruiksdoel: G.bag.gebruiksdoel, lat: G.bag.lat, lon: G.bag.lon } : null,
@@ -671,7 +709,7 @@ function bouwPdf(logo) {
   kv('Parkeren', G.woning.parkeren.join(' en ').toLowerCase());
   kv('Funderingsrisicoklasse', G.fundering ? G.fundering + (FUNDERING[G.fundering] ? ' (' + FUNDERING[G.fundering] + ')' : '') : '');
   if (G.fundering === 'D' || G.fundering === 'E') kv('Aandachtspunt', 'Bij deze klasse volgt in principe aanvullend funderingsonderzoek. Zie ' + FUNDAMENT.replace('https://', '').replace(/\/$/, '') + ' voor regie over het funderingsdossier.');
-  kv('Energielabel', G.energielabel);
+  kv('Energielabel', elTekst());
   kv('Verwarming', G.install.verwarming.join(', '));
   kv('Afgifte', G.install.afgifte.join(', '));
   kv('Warm water', G.install.warmwater.join(', '));

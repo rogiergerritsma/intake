@@ -1,6 +1,6 @@
 /* Teksten voor de info- en privacypagina's. Aanspreekvorm: u. */
 window.RG_TEKST = {
-  versie: '17 oktober 2026',
+  versie: '18 oktober 2026',
   over: [
     { k: 'Wat is Intake', p: [
       'Intake is een eenvoudige opname tijdens het verkoopgesprek. U loopt door de woning, maakt per ruimte foto’s, noteert wat u ziet en dicteert uw eigen opmerkingen. Ook de reden van verkoop, de gewenste timing en de prijsverwachting legt u vast.',
@@ -24,11 +24,12 @@ window.RG_TEKST = {
     { k: '2. Welke gegevens, en waarom', p: [
       'Wat u in Intake invult, zoals adressen, namen, notities en foto’s, bewaart uw toestel in de opslag van uw browser. Wij ontvangen dit niet en hebben er geen toegang toe.',
       'Typt u een adres, dan stuurt uw toestel de getypte tekst naar de openbare adresservice van PDOK (Kadaster) om suggesties en gebouwgegevens, zoals bouwjaar en oppervlakte, op te halen. Daarbij ziet PDOK uw IP-adres.',
+      'Voor het energielabel stuurt uw toestel het BAG-nummer van het gekozen adres naar een tussenstation bij Cloudflare, dat het label opvraagt bij EP-Online van de Rijksdienst voor Ondernemend Nederland (RVO). Het tussenstation bewaart geen gegevens over u of uw klanten en onthoudt het label per adres hooguit 24 uur.',
       'Gebruikt u de dicteerfunctie, dan verwerkt de spraakherkenning van uw browser (Apple of Google) uw spraak. Dat gebeurt buiten Intake.',
       'Met uw toestemming meten wij met Google Analytics hoe Intake wordt gebruikt, bijvoorbeeld hoe vaak een rapport wordt gemaakt. Wij meten nooit wat u invult. Zo zien we wat werkt en kunnen we de app verbeteren.',
       'Noteert u gegevens van uw klanten, dan bent u zelf verantwoordelijk voor de omgang daarmee, zoals een makelaar dat is voor zijn eigen dossiers.'] },
     { k: '3. Met wie delen wij gegevens', p: [
-      'PDOK/Kadaster, voor het opzoeken van adressen. Google Ireland Limited, voor Analytics, alleen na uw toestemming. Savvii, die de website host en in serverlogs kort uw IP-adres ziet.',
+      'PDOK/Kadaster, voor het opzoeken van adressen. RVO (EP-Online), voor het energielabel van een adres. Cloudflare, voor het tussenstation dat dit label opvraagt. Google Ireland Limited, voor Analytics, alleen na uw toestemming. Savvii, die de website host en in serverlogs kort uw IP-adres ziet.',
       'Wij verkopen geen gegevens. Een rapport of gegevensbestand dat u zelf deelt, gaat naar de ontvanger die u kiest.'] },
     { k: '4. Hoe lang bewaren wij gegevens', p: [
       'Uw gesprekken staan op uw toestel zolang u ze daar laat staan. U verwijdert ze met de knop Verwijder, of door de websitegegevens van uw browser te wissen.',
