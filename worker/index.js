@@ -3,7 +3,7 @@
 // Geeft per adres alleen het energielabel en een paar basisgegevens terug. Geen logging van adressen.
 
 const API = 'https://public.ep-online.nl/api/v5/PandEnergielabel/';
-const TOEGESTAAN = ['https://intake.bureau-wonen.nl', 'https://rondgang.bureau-wonen.nl'];
+const TOEGESTAAN = ['https://intake.bureau-wonen.nl'];
 
 function cors(origin) {
   const ok = TOEGESTAAN.includes(origin);
