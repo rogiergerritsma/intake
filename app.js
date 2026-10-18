@@ -15,7 +15,7 @@ var OPHALEN = ['woz'];
 var FUNDAMENT = 'https://bureau-fundament.nl/';
 var FUNDERING = { A: 'geen risico', B: 'licht risico', C: 'verhoogd risico of onzekerheid', D: 'hoog risico', E: 'vastgesteld probleem' };
 var LABELS = ['A++++', 'A+++', 'A++', 'A+', 'A', 'B', 'C', 'D', 'E', 'F', 'G'];
-var MAIL = 'mail@bureau-wonen.nl', REPO = 'https://github.com/rogiergerritsma/rondgang';
+var MAIL = 'mail@bureau-wonen.nl', REPO = 'https://github.com/rogiergerritsma/intake';
 
 var CFG = FALLBACK, DB = null, MEM = { gesprekken: {}, fotos: {} };
 var G = null, FOTOS = [], tab = 'start', cur = '', urls = {}, gen = null, busy = '', stopDictaat = null, logoCache = null;
@@ -55,7 +55,7 @@ function laadGA() {
   window.__gaLoaded = 1; window.dataLayer = window.dataLayer || [];
   window.gtag = function () { window.dataLayer.push(arguments); };
   window.gtag('js', new Date());
-  window.gtag('config', gaId(), { allow_google_signals: false, allow_ad_personalization_signals: false, content_group: 'rondgang' });
+  window.gtag('config', gaId(), { allow_google_signals: false, allow_ad_personalization_signals: false, content_group: 'intake' });
   document.head.appendChild(el('script', { async: '', src: 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(gaId()) }));
 }
 /* Alleen gebruik van de app, nooit wat er is ingevuld. */
@@ -123,8 +123,21 @@ function saveNow() { clearTimeout(saveT); if (G) { G.bijgewerkt = Date.now(); re
 
 function nieuw() {
   return { id: uid(), gemaakt: Date.now(), bijgewerkt: Date.now(), adres: '', contact: '', reden: [], redenTekst: '', aantallen: {},
-    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null, fundering: '', energielabel: '', woning: nieuwWoning(), install: nieuwInstall() };
+    timing: '', prijs: '', prijsBedrag: '', bijz: [], opm: '', rooms: {}, nFotos: 0, bag: null, fundering: '', energielabel: '', woning: nieuwWoning(), install: nieuwInstall(), gebouw: { bouwjaar: '', oppervlakte: '' } };
 }
+function maatInfo(key) {
+  var w = G.gebouw ? G.gebouw[key] : '', o = G.bag && G.bag[key] ? G.bag[key] : null;
+  var bron = !w ? null : (o == null ? 'handmatig' : (String(w) === String(o) ? 'bag' : 'aangepast'));
+  return { waarde: w ? Number(w) : null, bag: o, bron: bron };
+}
+function maatTekst(key, eenheid) {
+  var m = maatInfo(key); if (!m.waarde) return '';
+  var t = m.waarde + (eenheid ? ' ' + eenheid : '');
+  if (m.bron === 'aangepast') return t + ' (aangepast door makelaar, BAG: ' + m.bag + (eenheid ? ' ' + eenheid : '') + ')';
+  if (m.bron === 'handmatig') return t + ' (handmatig ingevuld, niet uit BAG)';
+  return t + ' (BAG)';
+}
+function maatJson(key) { var m = maatInfo(key); return m.waarde ? { waarde: m.waarde, bron: m.bron, bag_waarde: m.bag } : null; }
 function nieuwInstall() { return { verwarming: [], afgifte: [], warmwater: [], ketelBouwjaar: '' }; }
 function nieuwWoning() {
   return { hoofd: '', soort: '', bouwvorm: '', nieuwbouw: false, aanbouw: false, verdiepingen: '', oprit: '', parkeren: [] };
@@ -238,7 +251,7 @@ function infoKnop() {
 function titel() {
   var k = [];
   if (CFG.logo) k.push(el('img', { src: CFG.logo, alt: '' }));
-  k.push(el('h1', {}, ['Rondgang']));
+  k.push(el('h1', {}, ['Intake']));
   return el('div', { class: 'title' }, k);
 }
 
@@ -247,7 +260,7 @@ function home(app) {
   var isIOS = /iPhone|iPad/.test(navigator.userAgent);
   if (isIOS && !navigator.standalone && lsGet('rondgang.hint') !== '1') {
     app.appendChild(el('div', { class: 'warn' }, [
-      'Zet Rondgang op uw beginscherm (deel-icoon, dan Zet op beginscherm). Zo bewaart uw iPhone de gesprekken betrouwbaarder. ',
+      'Zet Intake op uw beginscherm (deel-icoon, dan Zet op beginscherm). Zo bewaart uw iPhone de gesprekken betrouwbaarder. ',
       el('button', { class: 'back', type: 'button', onclick: function () { lsSet('rondgang.hint', '1'); render(); } }, ['Begrepen'])]));
   }
   app.appendChild(el('div', { class: 'card intro' }, [
@@ -287,6 +300,7 @@ function openGesprek(g) {
   if (!G.aantallen) G.aantallen = {};
   if (!G.woning) G.woning = nieuwWoning();
   if (!G.install) G.install = nieuwInstall();
+  if (!G.gebouw) G.gebouw = { bouwjaar: G.bag && G.bag.bouwjaar ? String(G.bag.bouwjaar) : '', oppervlakte: G.bag && G.bag.oppervlakte ? String(G.bag.oppervlakte) : '' };
   fotosVan(g.id).then(function (fs) { FOTOS = fs; render(); });
 }
 
@@ -301,6 +315,26 @@ function vStart(app) {
     role: 'combobox', 'aria-autocomplete': 'list', 'aria-expanded': 'false', 'aria-controls': 'sug' }); adres.value = G.adres;
   var sug = el('div', { class: 'sug', id: 'sug', role: 'listbox', hidden: '' });
   var bagBox = el('div', { class: 'auto', id: 'bag', hidden: '' }), bagMsg = '';
+  var maatBox = el('div', { class: 'stack', id: 'maat' }), maatEls = {};
+  function paintMaat() {
+    [['bouwjaar', ''], ['oppervlakte', 'm²']].forEach(function (k) {
+      var m = maatInfo(k[0]), st = maatEls[k[0]].st, inp = maatEls[k[0]].inp;
+      if (document.activeElement !== inp) inp.value = G.gebouw[k[0]] || '';
+      st.textContent = ''; st.className = 'hint' + (m.bron === 'aangepast' ? ' aangepast' : '');
+      if (m.bron === 'aangepast') {
+        st.appendChild(document.createTextNode('Aangepast door u. BAG: ' + m.bag + (k[1] ? ' ' + k[1] : '') + '. Dit staat zo in het rapport. '));
+        st.appendChild(el('button', { class: 'link', type: 'button', onclick: function () { G.gebouw[k[0]] = String(m.bag); save(); paintMaat(); } }, ['Terug naar BAG']));
+      } else if (m.bron === 'handmatig') st.textContent = 'Handmatig ingevuld, niet uit BAG. Dit staat zo in het rapport.';
+      else if (m.bron === 'bag') st.textContent = 'Uit BAG. Pas aan als dit niet klopt.';
+      else st.textContent = 'Nog niet bekend. Vul zelf in als u het weet.';
+    });
+  }
+  [['bouwjaar', 'Bouwjaar', '4'], ['oppervlakte', 'Gebruiksoppervlakte (m²)', '5']].forEach(function (k) {
+    var inp = el('input', { type: 'text', inputmode: 'numeric', id: 'maat-' + k[0], maxlength: k[2], autocomplete: 'off' }), st = el('span', { class: 'hint', role: 'status' });
+    inp.addEventListener('input', function () { G.gebouw[k[0]] = inp.value.replace(/[^0-9]/g, ''); save(); paintMaat(); });
+    maatEls[k[0]] = { inp: inp, st: st };
+    maatBox.appendChild(el('div', {}, [el('label', { for: 'maat-' + k[0] }, [k[1]]), inp, st]));
+  });
   var timer = null;
   function sluit() { sug.hidden = true; sug.textContent = ''; adres.setAttribute('aria-expanded', 'false'); }
   function paintBag() {
@@ -311,18 +345,18 @@ function vStart(app) {
     if (bagMsg) { bagBox.appendChild(el('span', {}, [bagMsg])); }
     if (!b) return;
     bagBox.appendChild(el('b', {}, ['Uit openbare bronnen (BAG). ']));
-    var regels = [['Postcode en plaats', [b.postcode, b.plaats].filter(Boolean).join(' ')], ['Bouwjaar', b.bouwjaar], ['Gebruiksoppervlakte', b.oppervlakte ? b.oppervlakte + ' m²' : ''], ['Gebruiksdoel', b.gebruiksdoel]]
+    var regels = [['Postcode en plaats', [b.postcode, b.plaats].filter(Boolean).join(' ')], ['Gebruiksdoel', b.gebruiksdoel]]
       .filter(function (r) { return r[1]; });
     var dl = el('dl', { class: 'sum bagdl' }, []);
     regels.forEach(function (r) { dl.appendChild(el('dt', {}, [r[0]])); dl.appendChild(el('dd', {}, [String(r[1])])); });
     bagBox.appendChild(dl);
-    bagBox.appendChild(el('span', { class: 'hint' }, ['Controleer dit zelf. Energielabel en WOZ-waarde haalt u nog zelf op.']));
+    bagBox.appendChild(el('span', { class: 'hint' }, ['Controleer dit zelf. Bouwjaar en oppervlakte kunt u hieronder aanpassen. Energielabel en WOZ-waarde haalt u nog zelf op.']));
   }
   function kies(d) {
-    sluit(); adres.value = d.weergavenaam; G.adres = d.weergavenaam; G.bag = null; bagMsg = 'Gegevens ophalen…'; paintBag();
+    sluit(); adres.value = d.weergavenaam; G.adres = d.weergavenaam; G.bag = null; G.gebouw = { bouwjaar: '', oppervlakte: '' }; bagMsg = 'Gegevens ophalen…'; paintBag(); paintMaat();
     var sub = document.getElementById('adres-sub'); if (sub) sub.textContent = G.adres;
     var my = ++bagTok; save(); track('adres_gekozen');
-    haalBag(d).then(function (b) { if (my !== bagTok || !G) return; G.bag = b; bagMsg = ''; save(); paintBag(); })
+    haalBag(d).then(function (b) { if (my !== bagTok || !G) return; G.bag = b; G.gebouw = { bouwjaar: b.bouwjaar ? String(b.bouwjaar) : '', oppervlakte: b.oppervlakte ? String(b.oppervlakte) : '' }; bagMsg = ''; save(); paintBag(); paintMaat(); })
       .catch(function () { if (my !== bagTok) return; bagMsg = 'Ophalen lukte niet. U kunt het adres gewoon zelf invullen.'; paintBag(); });
   }
   adres.addEventListener('input', function () {
@@ -341,7 +375,7 @@ function vStart(app) {
       }).catch(sluit);
     }, 250);
   });
-  paintBag();
+  paintBag(); paintMaat();
   var contact = el('input', { type: 'text', id: 'contact', placeholder: 'Naam verkoper', autocomplete: 'off' }); contact.value = G.contact;
   contact.addEventListener('input', function () { G.contact = contact.value; save(); });
   var rt = el('textarea', { id: 'redentekst', placeholder: 'Waarom verkopen ze? Typ, of dicteer.' }); rt.value = G.redenTekst || '';
@@ -351,6 +385,7 @@ function vStart(app) {
     el('h2', {}, ['Het gesprek']),
     el('div', { class: 'adresveld' }, [el('label', { for: 'adres' }, ['Adres']), adres, sug]),
     bagBox,
+    maatBox,
     el('div', {}, [el('label', { for: 'contact' }, ['Contactpersoon']), contact]),
     el('div', {}, [el('div', { class: 'lbl' }, ['Reden(en) van verkoop']), rc]),
     el('div', {}, [el('label', { for: 'redentekst' }, ['Toelichting']), rt]),
@@ -405,7 +440,7 @@ function vStart(app) {
     el('span', { class: 'hint' }, ['A geen risico, B licht, C verhoogd of onzeker, D hoog, E vastgesteld probleem. Staat in het KCAF-rapport, het taxatierapport of de advertentie.']),
     fundBox,
     el('div', {}, [el('div', { class: 'lbl' }, ['Energielabel']), el2]),
-    el('span', { class: 'hint' }, ['Voorlopig vult u dit zelf in. Later haalt Rondgang het automatisch op.'])
+    el('span', { class: 'hint' }, ['Voorlopig vult u dit zelf in. Later haalt Intake het automatisch op.'])
   ]));
   paintFund();
   var I = G.install, IC = CFG.installaties || {};
@@ -517,7 +552,7 @@ function roomList() {
   return names.filter(function (n) { var r = G.rooms[n]; return fotosIn(n).length || (r && (r.note || r.staat || (r.kenm && r.kenm.length))); });
 }
 function payload() {
-  return { versie: 4, bureau: kantoor() || null, opgenomen_door: opnemer() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
+  return { versie: 5, bureau: kantoor() || null, opgenomen_door: opnemer() || null, gesprek: G.id, gestart: new Date(G.gemaakt).toISOString(),
     adres: G.adres || null, contact: G.contact || null,
     verkoper: { reden: G.reden, reden_toelichting: G.redenTekst || null, timing: G.timing || null,
       prijsverwachting: G.prijs || null, prijsbedrag_eur: G.prijsBedrag ? Number(G.prijsBedrag) : null },
@@ -527,6 +562,7 @@ function payload() {
       verdiepingen: G.woning.verdiepingen || null, oprit: G.woning.oprit || null, parkeren: G.woning.parkeren },
     installaties: { verwarming: G.install.verwarming, afgifte: G.install.afgifte, warm_water: G.install.warmwater, bouwjaar_installatie: G.install.ketelBouwjaar ? Number(G.install.ketelBouwjaar) : null },
     fundering: G.fundering ? { klasse: G.fundering, toelichting: FUNDERING[G.fundering] || null } : null, energielabel: G.energielabel || null,
+    gebouw: { bouwjaar: maatJson('bouwjaar'), gebruiksoppervlakte_m2: maatJson('oppervlakte') },
     openbare_bronnen: G.bag ? { bron: 'BAG via PDOK', opgehaald: G.bag.datum, postcode: G.bag.postcode, plaats: G.bag.plaats, gemeente: G.bag.gemeente,
       bouwjaar: G.bag.bouwjaar, gebruiksoppervlakte_m2: G.bag.oppervlakte, gebruiksdoel: G.bag.gebruiksdoel, lat: G.bag.lat, lon: G.bag.lon } : null,
     op_te_halen: OPHALEN };
@@ -543,7 +579,7 @@ function bijzTekst() {
 }
 function bestandsnaam(ext) {
   var a = (G.adres || 'gesprek').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
-  return 'Opname-' + a + '-' + new Date(G.gemaakt).toISOString().slice(0, 10) + '.' + ext;
+  return 'Intake-' + a + '-' + new Date(G.gemaakt).toISOString().slice(0, 10) + '.' + ext;
 }
 function deel(blob, naam, type) {
   var f = new File([blob], naam, { type: type });
@@ -602,8 +638,8 @@ function bouwPdf(logo) {
   d.setTextColor(INK[0], INK[1], INK[2]); d.setFont('helvetica', 'bold'); d.setFontSize(15);
   if (kn) {
     d.text(clean(kn).toUpperCase(), tx, 14);
-    d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(MUT[0], MUT[1], MUT[2]); d.text('OPNAME VERKOOPGESPREK', tx, 20, { charSpace: 0.8 });
-  } else { d.text('OPNAME VERKOOPGESPREK', tx, 17, { charSpace: 0.8 }); }
+    d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(MUT[0], MUT[1], MUT[2]); d.text('INTAKE VERKOOPGESPREK', tx, 20, { charSpace: 0.8 });
+  } else { d.text('INTAKE VERKOOPGESPREK', tx, 17, { charSpace: 0.8 }); }
   y = 40;
   txt(G.adres || 'Adres onbekend', 20, true, INK, 1);
   txt(datum(G.gemaakt) + (G.contact ? '  |  ' + G.contact : ''), 10, false, MUT, opnemer() ? 1 : 2);
@@ -619,13 +655,13 @@ function bouwPdf(logo) {
   if (G.bag) {
     sec('Uit openbare bronnen (BAG)');
     kv('Postcode en plaats', [G.bag.postcode, G.bag.plaats].filter(Boolean).join(' '));
-    kv('Bouwjaar', G.bag.bouwjaar ? String(G.bag.bouwjaar) : '');
-    kv('Gebruiksoppervlakte', G.bag.oppervlakte ? G.bag.oppervlakte + ' m2' : '');
     kv('Gebruiksdoel', G.bag.gebruiksdoel);
     kv('Opgehaald op', G.bag.datum);
   }
   sec('Woning');
   kv('Type', typeTekst().replace(/^, /, ''));
+  kv('Bouwjaar', maatTekst('bouwjaar', ''));
+  kv('Gebruiksoppervlakte', maatTekst('oppervlakte', 'm2'));
   kv('Aantal verdiepingen', G.woning.verdiepingen);
   kv('Oprit', G.woning.oprit);
   kv('Parkeren', G.woning.parkeren.join(' en ').toLowerCase());
@@ -660,7 +696,7 @@ function bouwPdf(logo) {
     var n = d.getNumberOfPages();
     for (var i = 1; i <= n; i++) {
       d.setPage(i); d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(MUT[0], MUT[1], MUT[2]);
-      d.text('Gemaakt met Rondgang, een gratis initiatief van Bureau Wonen  |  bureau-wonen.nl  |  ' + MAIL, M, H - 8); d.text(i + ' / ' + n, W - M, H - 8, { align: 'right' });
+      d.text('Gemaakt met Intake, een gratis initiatief van Bureau Wonen  |  bureau-wonen.nl  |  ' + MAIL, M, H - 8); d.text(i + ' / ' + n, W - M, H - 8, { align: 'right' });
     }
     return d.output('blob');
   });
@@ -670,8 +706,8 @@ function vRapport(app) {
   var p = payload(), nf = FOTOS.length;
   var dl = el('dl', { class: 'sum' }, [
     el('dt', {}, ['Adres']), el('dd', {}, [p.adres || 'Niet ingevuld']),
-    p.openbare_bronnen && (p.openbare_bronnen.bouwjaar || p.openbare_bronnen.gebruiksoppervlakte_m2) ? el('dt', {}, ['Bouwjaar en oppervlakte']) : null,
-    p.openbare_bronnen && (p.openbare_bronnen.bouwjaar || p.openbare_bronnen.gebruiksoppervlakte_m2) ? el('dd', {}, [[p.openbare_bronnen.bouwjaar, p.openbare_bronnen.gebruiksoppervlakte_m2 ? p.openbare_bronnen.gebruiksoppervlakte_m2 + ' m²' : ''].filter(Boolean).join(', ')]) : null,
+    G.gebouw && (G.gebouw.bouwjaar || G.gebouw.oppervlakte) ? el('dt', {}, ['Bouwjaar en oppervlakte']) : null,
+    G.gebouw && (G.gebouw.bouwjaar || G.gebouw.oppervlakte) ? el('dd', {}, [[maatInfo('bouwjaar').waarde, maatInfo('oppervlakte').waarde ? maatInfo('oppervlakte').waarde + ' m²' : ''].filter(Boolean).join(', ') + (maatInfo('bouwjaar').bron === 'aangepast' || maatInfo('oppervlakte').bron === 'aangepast' ? ' (aangepast t.o.v. BAG)' : '')]) : null,
     typeTekst() ? el('dt', {}, ['Type woning']) : null, typeTekst() ? el('dd', {}, [typeTekst().replace(/^, /, '')]) : null,
     G.fundering ? el('dt', {}, ['Fundering']) : null, G.fundering ? el('dd', {}, ['Klasse ' + G.fundering + (FUNDERING[G.fundering] ? ', ' + FUNDERING[G.fundering] : '')]) : null,
     el('dt', {}, ['Reden en timing']), el('dd', {}, [p.verkoper.reden.concat(p.verkoper.timing ? [p.verkoper.timing] : []).join(', ') || 'Niet ingevuld']),
@@ -707,7 +743,7 @@ function jsonVan(g) {
   return fotosVan(g.id).then(function (fs) {
     G = g; FOTOS = fs;
     if (typeof G.reden === 'string') G.reden = G.reden ? [G.reden] : [];
-    G.reden = G.reden || []; G.aantallen = G.aantallen || {}; G.bijz = G.bijz || []; G.woning = G.woning || nieuwWoning(); G.install = G.install || nieuwInstall();
+    G.reden = G.reden || []; G.aantallen = G.aantallen || {}; G.bijz = G.bijz || []; G.woning = G.woning || nieuwWoning(); G.install = G.install || nieuwInstall(); G.gebouw = G.gebouw || { bouwjaar: '', oppervlakte: '' };
     try { return JSON.stringify(payload(), null, 2); } finally { G = oG; FOTOS = oF; }
   });
 }
@@ -717,7 +753,7 @@ function menuPagina(app) {
   function kop(t) { app.appendChild(el('header', {}, [el('h1', {}, [t])])); }
   if (menu === 'menu') {
     kop('Menu');
-    var items = [['over', 'Over Rondgang', 'Wat het is en waarom'], ['instellingen', 'Instellingen', 'Uw naam en kantoor in het rapport'],
+    var items = [['over', 'Over Intake', 'Wat het is en waarom'], ['instellingen', 'Instellingen', 'Uw naam en kantoor in het rapport'],
       ['export', 'Gegevens exporteren', 'JSON-bestand per gesprek'], ['privacy', 'Privacyverklaring', ''], gaId() ? ['cookies', 'Cookie-instellingen', ''] : null].filter(Boolean);
     app.appendChild(el('div', { class: 'list' }, items.map(function (i) {
       return el('button', { class: 'menuitem', type: 'button', id: 'm-' + i[0], onclick: function () { menu = i[0]; render(); window.scrollTo(0, 0); } },
@@ -725,17 +761,17 @@ function menuPagina(app) {
     })));
     if (window.RONDGANG_VERSION) app.appendChild(el('div', { class: 'ver' }, ['versie ' + window.RONDGANG_VERSION]));
   } else if (menu === 'over') {
-    kop('Over Rondgang');
+    kop('Over Intake');
     var T = window.RG_TEKST.over;
     app.appendChild(el('div', { class: 'card' }, [prose(T.slice(0, 2))]));
     app.appendChild(el('div', { class: 'card' }, [prose(T.slice(2))]));
     var mailStatus = el('span', { class: 'hint', role: 'status' }, ['']);
     app.appendChild(el('div', { class: 'card' }, [
-      el('h2', {}, ['Gebruikt u Rondgang?']),
+      el('h2', {}, ['Gebruikt u Intake?']),
       el('p', {}, ['Vindt u het leuk en handig? Stuur dan een mail en laat weten dat u het gebruikt. Dat is fijn om te weten, en uw ideeën zijn welkom.']),
       el('p', { class: 'mailadres' }, [MAIL]),
       el('div', { class: 'row' }, [
-        el('a', { class: 'btn', id: 'mail', href: 'mailto:' + MAIL + '?subject=' + encodeURIComponent('Ik gebruik Rondgang'), onclick: function () { track('mail_klik', { locatie: 'over' }); } }, ['Stuur een mail']),
+        el('a', { class: 'btn', id: 'mail', href: 'mailto:' + MAIL + '?subject=' + encodeURIComponent('Ik gebruik Intake'), onclick: function () { track('mail_klik', { locatie: 'over' }); } }, ['Stuur een mail']),
         el('button', { class: 'btn ghost', type: 'button', id: 'kopieer', onclick: function () {
           track('mail_klik', { locatie: 'kopieer' });
           var ok = function () { mailStatus.textContent = 'Adres gekopieerd.'; }, nee = function () { mailStatus.textContent = 'Kopiëren lukte niet. Selecteer het adres hierboven.'; };
@@ -744,7 +780,7 @@ function menuPagina(app) {
       mailStatus]));
     app.appendChild(el('div', { class: 'card' }, [
       el('h2', {}, ['Wie maakt dit']),
-      el('p', {}, ['Rondgang is gemaakt door Rogier Gerritsma, makelaar in Abcoude, als leuk initiatief. De code is open source (MIT) en staat op GitHub.']),
+      el('p', {}, ['Intake is gemaakt door Rogier Gerritsma, makelaar in Abcoude, als leuk initiatief. De code is open source (MIT) en staat op GitHub.']),
       el('a', { class: 'btn ghost', href: REPO, target: '_blank', rel: 'noopener' }, ['Bekijk de code'])]));
   } else if (menu === 'instellingen') {
     kop('Instellingen');
@@ -781,7 +817,7 @@ function menuPagina(app) {
     kop('Cookie-instellingen');
     var k = keuze();
     app.appendChild(el('div', { class: 'card' }, [
-      el('p', {}, ['Rondgang meet met Google Analytics hoe de app wordt gebruikt, alleen als u dat goed vindt. We meten nooit wat u invult.']),
+      el('p', {}, ['Intake meet met Google Analytics hoe de app wordt gebruikt, alleen als u dat goed vindt. We meten nooit wat u invult.']),
       el('p', {}, [el('b', {}, ['Uw keuze nu: ']), k === 'ja' ? 'meten staat aan' : k === 'nee' ? 'meten staat uit' : 'nog geen keuze']),
       el('div', { class: 'row' }, [
         el('button', { class: 'btn', type: 'button', id: 'ck-ja', onclick: function () { zetKeuze('ja'); } }, ['Prima']),
@@ -812,7 +848,7 @@ function pasToe() {
   var r = document.documentElement.style;
   r.setProperty('--accent-base', CFG.accent);
   r.setProperty('--accent-ink-l', lum(CFG.accent) > 0.45 ? '#10201a' : '#ffffff');
-  document.title = 'Rondgang';
+  document.title = 'Intake';
 }
 function laadConfig() {
   var q = new URLSearchParams(location.search).get('config');
