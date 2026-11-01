@@ -1,8 +1,8 @@
-# Intake
+# BW Intake
 
 Een leuk, gratis initiatief van Rogier Gerritsma (makelaar, Abcoude). Open source onder de MIT-licentie, zie `LICENSE`.
 
-Intake-app voor het verkoopgesprek. Losse bestanden, geen server nodig: alle gegevens blijven op het toestel.
+BW Intake-app voor het verkoopgesprek. Losse bestanden, geen server nodig: alle gegevens blijven op het toestel.
 
 - `index.html`, `app.js`, `style.css`: de app
 - `config.json`: instellingen per makelaar (naam, kleur, ruimtes, chips)

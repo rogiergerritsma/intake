@@ -264,7 +264,7 @@ function infoKnop() {
 function titel() {
   var k = [];
   if (CFG.logo) k.push(el('img', { src: CFG.logo, alt: '' }));
-  k.push(el('h1', {}, ['Intake']));
+  k.push(el('h1', {}, ['BW Intake']));
   return el('div', { class: 'title' }, k);
 }
 
@@ -273,13 +273,13 @@ function home(app) {
   var isIOS = /iPhone|iPad/.test(navigator.userAgent);
   if (isIOS && !navigator.standalone && lsGet('rondgang.hint') !== '1') {
     app.appendChild(el('div', { class: 'warn' }, [
-      'Zet Intake op uw beginscherm (deel-icoon, dan Zet op beginscherm). Zo bewaart uw iPhone de gesprekken betrouwbaarder. ',
+      'Zet BW Intake op uw beginscherm (deel-icoon, dan Zet op beginscherm). Zo bewaart uw iPhone de gesprekken betrouwbaarder. ',
       el('button', { class: 'back', type: 'button', onclick: function () { lsSet('rondgang.hint', '1'); render(); } }, ['Begrepen'])]));
   }
   app.appendChild(el('div', { class: 'card intro' }, [
     el('h2', {}, ['Snel vastleggen tijdens het verkoopgesprek']),
     el('p', {}, ['Foto’s, notities en dictaat per ruimte, plus de wensen van de verkoper. Daarna maakt u een PDF-rapport waarmee u een goede offerte maakt, omdat u precies weet hoe het huis was.']),
-    el('p', { class: 'hint' }, ['Gratis. Alles blijft op uw toestel. ', el('button', { class: 'link', type: 'button', onclick: function () { menu = 'over'; render(); window.scrollTo(0, 0); } }, ['Meer over Intake'])])]));
+    el('p', { class: 'hint' }, ['Gratis. Alles blijft op uw toestel. ', el('button', { class: 'link', type: 'button', onclick: function () { menu = 'over'; render(); window.scrollTo(0, 0); } }, ['Meer over BW Intake'])])]));
   app.appendChild(el('button', { class: 'btn', type: 'button', id: 'nieuw', onclick: function () { G = nieuw(); FOTOS = []; tab = 'start'; cur = ''; gen = null; put('gesprekken', G); track('gesprek_gestart'); render(); } }, ['Nieuw gesprek']));
   var lijst = el('div', { class: 'list', id: 'lijst' });
   app.appendChild(lijst);
@@ -473,7 +473,7 @@ function vStart(app) {
       elSt.appendChild(el('button', { class: 'link', type: 'button', onclick: function () { G.energielabel = e.ep; save(); paintEL(); } }, ['Terug naar EP-Online']));
     } else if (e.geen) elSt.textContent = 'Geen label gevonden in EP-Online. Kies het label zelf, als u het weet.';
     else if (e.bron === 'handmatig') elSt.textContent = 'Handmatig gekozen.';
-    else elSt.textContent = 'Kies een adres, dan zoekt Intake het label op. U kunt het ook zelf kiezen.';
+    else elSt.textContent = 'Kies een adres, dan zoekt BW Intake het label op. U kunt het ook zelf kiezen.';
   }
   window.__paintEL = paintEL;
   app.appendChild(el('div', { class: 'card' }, [
@@ -621,7 +621,7 @@ function bijzTekst() {
 }
 function bestandsnaam(ext) {
   var a = (G.adres || 'gesprek').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
-  return 'Intake-' + a + '-' + new Date(G.gemaakt).toISOString().slice(0, 10) + '.' + ext;
+  return 'BW-Intake-' + a + '-' + new Date(G.gemaakt).toISOString().slice(0, 10) + '.' + ext;
 }
 function deel(blob, naam, type) {
   var f = new File([blob], naam, { type: type });
@@ -738,7 +738,7 @@ function bouwPdf(logo) {
     var n = d.getNumberOfPages();
     for (var i = 1; i <= n; i++) {
       d.setPage(i); d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(MUT[0], MUT[1], MUT[2]);
-      d.text('Gemaakt met Intake, een gratis initiatief van Bureau Wonen  |  bureau-wonen.nl  |  ' + MAIL, M, H - 8); d.text(i + ' / ' + n, W - M, H - 8, { align: 'right' });
+      d.text('Gemaakt met BW Intake, een gratis initiatief van Bureau Wonen  |  bureau-wonen.nl  |  ' + MAIL, M, H - 8); d.text(i + ' / ' + n, W - M, H - 8, { align: 'right' });
     }
     return d.output('blob');
   });
@@ -799,7 +799,7 @@ function menuPagina(app) {
   function kop(t) { app.appendChild(el('header', {}, [el('h1', {}, [t])])); }
   if (menu === 'menu') {
     kop('Menu');
-    var items = [['over', 'Over Intake', 'Wat het is en waarom'], ['instellingen', 'Instellingen', 'Uw naam en kantoor in het rapport'],
+    var items = [['over', 'Over BW Intake', 'Wat het is en waarom'], ['instellingen', 'Instellingen', 'Uw naam en kantoor in het rapport'],
       ['export', 'Gegevens exporteren', 'JSON-bestand per gesprek'], ['privacy', 'Privacyverklaring', ''], gaId() ? ['cookies', 'Cookie-instellingen', ''] : null].filter(Boolean);
     app.appendChild(el('div', { class: 'list' }, items.map(function (i) {
       return el('button', { class: 'menuitem', type: 'button', id: 'm-' + i[0], onclick: function () { menu = i[0]; render(); window.scrollTo(0, 0); } },
@@ -807,17 +807,17 @@ function menuPagina(app) {
     })));
     if (window.RONDGANG_VERSION) app.appendChild(el('div', { class: 'ver' }, ['versie ' + window.RONDGANG_VERSION]));
   } else if (menu === 'over') {
-    kop('Over Intake');
+    kop('Over BW Intake');
     var T = window.RG_TEKST.over;
     app.appendChild(el('div', { class: 'card' }, [prose(T.slice(0, 2))]));
     app.appendChild(el('div', { class: 'card' }, [prose(T.slice(2))]));
     var mailStatus = el('span', { class: 'hint', role: 'status' }, ['']);
     app.appendChild(el('div', { class: 'card' }, [
-      el('h2', {}, ['Gebruikt u Intake?']),
+      el('h2', {}, ['Gebruikt u BW Intake?']),
       el('p', {}, ['Vindt u het leuk en handig? Stuur dan een mail en laat weten dat u het gebruikt. Dat is fijn om te weten, en uw ideeën zijn welkom.']),
       el('p', { class: 'mailadres' }, [MAIL]),
       el('div', { class: 'row' }, [
-        el('a', { class: 'btn', id: 'mail', href: 'mailto:' + MAIL + '?subject=' + encodeURIComponent('Ik gebruik Intake'), onclick: function () { track('mail_klik', { locatie: 'over' }); } }, ['Stuur een mail']),
+        el('a', { class: 'btn', id: 'mail', href: 'mailto:' + MAIL + '?subject=' + encodeURIComponent('Ik gebruik BW Intake'), onclick: function () { track('mail_klik', { locatie: 'over' }); } }, ['Stuur een mail']),
         el('button', { class: 'btn ghost', type: 'button', id: 'kopieer', onclick: function () {
           track('mail_klik', { locatie: 'kopieer' });
           var ok = function () { mailStatus.textContent = 'Adres gekopieerd.'; }, nee = function () { mailStatus.textContent = 'Kopiëren lukte niet. Selecteer het adres hierboven.'; };
@@ -826,7 +826,7 @@ function menuPagina(app) {
       mailStatus]));
     app.appendChild(el('div', { class: 'card' }, [
       el('h2', {}, ['Wie maakt dit']),
-      el('p', {}, ['Intake is gemaakt door Rogier Gerritsma, makelaar in Abcoude, als leuk initiatief. De code is open source (MIT) en staat op GitHub.']),
+      el('p', {}, ['BW Intake is gemaakt door Rogier Gerritsma, makelaar in Abcoude, als leuk initiatief. De code is open source (MIT) en staat op GitHub.']),
       el('a', { class: 'btn ghost', href: REPO, target: '_blank', rel: 'noopener' }, ['Bekijk de code'])]));
   } else if (menu === 'instellingen') {
     kop('Instellingen');
@@ -863,7 +863,7 @@ function menuPagina(app) {
     kop('Cookie-instellingen');
     var k = keuze();
     app.appendChild(el('div', { class: 'card' }, [
-      el('p', {}, ['Intake meet met Google Analytics hoe de app wordt gebruikt, alleen als u dat goed vindt. We meten nooit wat u invult.']),
+      el('p', {}, ['BW Intake meet met Google Analytics hoe de app wordt gebruikt, alleen als u dat goed vindt. We meten nooit wat u invult.']),
       el('p', {}, [el('b', {}, ['Uw keuze nu: ']), k === 'ja' ? 'meten staat aan' : k === 'nee' ? 'meten staat uit' : 'nog geen keuze']),
       el('div', { class: 'row' }, [
         el('button', { class: 'btn', type: 'button', id: 'ck-ja', onclick: function () { zetKeuze('ja'); } }, ['Prima']),
@@ -894,7 +894,7 @@ function pasToe() {
   var r = document.documentElement.style;
   r.setProperty('--accent-base', CFG.accent);
   r.setProperty('--accent-ink-l', lum(CFG.accent) > 0.45 ? '#10201a' : '#ffffff');
-  document.title = 'Intake';
+  document.title = 'BW Intake';
 }
 function laadConfig() {
   var q = new URLSearchParams(location.search).get('config');

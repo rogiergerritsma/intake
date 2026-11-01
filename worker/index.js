@@ -1,4 +1,4 @@
-// Intake - energielabel-proxy (Cloudflare Worker)
+// BW Intake - energielabel-proxy (Cloudflare Worker)
 // Houdt de EP-Online API-sleutel (RVO) uit de app. De sleutel staat alleen als geheim EP_KEY in Cloudflare.
 // Geeft per adres alleen het energielabel en een paar basisgegevens terug. Geen logging van adressen.
 
