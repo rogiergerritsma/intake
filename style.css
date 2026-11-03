@@ -131,3 +131,6 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 @media (min-width:900px) and (hover:none){ .chip{min-height:56px} }
 .hint.aangepast{color:var(--accent,#B47070)}
 .foot.sites{margin-top:-6px}
+
+/* Was an inline <style> in index.html; moved here so the CSP can use style-src 'self' (see .htaccess). */
+:root{color-scheme:light dark;padding-top:env(safe-area-inset-top,0px)}

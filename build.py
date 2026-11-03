@@ -17,7 +17,6 @@ index = '''<!doctype html>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="stylesheet" href="style.css">
-<style>:root{color-scheme:light dark;padding-top:env(safe-area-inset-top,0px)}</style>
 </head><body>
 <div class="wrap" id="app"></div>
 <nav id="nav" hidden></nav>

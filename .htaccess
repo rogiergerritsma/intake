@@ -1,0 +1,15 @@
+# Security headers for intake.bureau-wonen.nl
+# Fixes the Aikido findings: CSP, HSTS, anti-clickjacking, X-Powered-By. Requires Apache mod_headers (standard on Plesk).
+# HSTS deliberately without includeSubDomains/preload: not every subdomain is guaranteed HTTPS-only.
+# Check after deploy: curl -sI https://intake.bureau-wonen.nl/ | grep -iE 'content-security|strict-transport|x-frame|x-powered'
+<IfModule mod_headers.c>
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "accelerometer=(), autoplay=(), camera=(self), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(self), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), browsing-topics=()"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://www.googletagmanager.com; style-src 'self'; font-src 'self'; img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com; connect-src 'self' https://api.pdok.nl https://service.pdok.nl https://intake-energielabel.rogier-5cd.workers.dev https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; worker-src 'self'; manifest-src 'self'; object-src 'self' blob:; frame-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
+  # Plesk adds "X-Powered-By: PleskLin"; remove it from both header tables.
+  Header always unset X-Powered-By
+  Header unset X-Powered-By
+</IfModule>
