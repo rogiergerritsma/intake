@@ -32,4 +32,16 @@ index = '''<!doctype html>
 sw = (root / 'sw.js').read_text()
 sw = re.sub(r"var V = 'rondgang-[^']*';", f"var V = 'rondgang-{version}';", sw)
 (root / 'sw.js').write_text(sw)
+
+# Cloudflare: alleen wat de site nodig heeft in dist/ zetten (geen worker/, README, .git e.d.).
+import shutil
+dist = root / 'dist'
+if dist.exists():
+    shutil.rmtree(dist)
+dist.mkdir()
+for naam in ['index.html', 'app.js', 'teksten.js', 'version.js', 'sw.js', 'style.css', 'config.json',
+             'manifest.webmanifest', 'logo.png', 'icon-180.png', 'icon-192.png', 'icon-512.png', '_headers']:
+    shutil.copy(root / naam, dist / naam)
+shutil.copytree(root / 'fonts', dist / 'fonts')
+shutil.copytree(root / 'vendor', dist / 'vendor')
 print('gebouwd', version)

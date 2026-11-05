@@ -1,0 +1,17 @@
+# Beveiligingsheaders voor intake.bureau-wonen.nl (Cloudflare Workers static assets).
+# Zelfde regels als eerder in .htaccess. HSTS bewust zonder includeSubDomains/preload.
+/*
+  Strict-Transport-Security: max-age=31536000
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), autoplay=(), camera=(self), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(self), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), browsing-topics=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.googletagmanager.com; style-src 'self'; font-src 'self'; img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com; connect-src 'self' https://api.pdok.nl https://service.pdok.nl https://intake-energielabel.rogier-5cd.workers.dev https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; worker-src 'self'; manifest-src 'self'; object-src 'self' blob:; frame-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests
+
+# Updates direct zichtbaar: service worker en startpagina altijd opnieuw controleren.
+/sw.js
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/version.js
+  Cache-Control: no-cache
