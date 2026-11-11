@@ -623,6 +623,25 @@ function bestandsnaam(ext) {
   var a = (G.adres || 'gesprek').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
   return 'BW-Intake-' + a + '-' + new Date(G.gemaakt).toISOString().slice(0, 10) + '.' + ext;
 }
+/* PDF bekijken met de juiste bestandsnaam. Een blob:-adres heeft geen naam, dan maakt iOS er unknown.pdf van.
+   Daarom zetten we de pdf in de cache onder rapport/<naam>.pdf; sw.js levert hem daar af (alleen op het toestel). */
+var RAPPORT_CACHE = 'intake-rapport';
+function bewaarPdf(g) {
+  if (!(window.caches && navigator.serviceWorker && navigator.serviceWorker.controller)) return Promise.resolve();
+  var pad = new URL('rapport/' + g.naam, location.href).href;
+  return caches.open(RAPPORT_CACHE).then(function (c) {
+    return c.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return c.delete(k); })); }).then(function () {
+      return c.put(pad, new Response(g.blob, { headers: { 'Content-Type': 'application/pdf',
+        'Content-Disposition': 'inline; filename="' + g.naam + '"', 'Cache-Control': 'no-store' } }));
+    });
+  }).then(function () { g.pad = pad; }).catch(function () {});
+}
+function bekijkPdf(g) {
+  if (g.pad) { if (!window.open(g.pad, '_blank')) location.href = g.pad; return; }
+  var u = URL.createObjectURL(g.blob), w = window.open(u, '_blank');
+  if (!w) location.href = u;
+  setTimeout(function () { URL.revokeObjectURL(u); }, 120000);
+}
 function deel(blob, naam, type) {
   var f = new File([blob], naam, { type: type });
   if (navigator.canShare && navigator.canShare({ files: [f] })) {
@@ -760,15 +779,13 @@ function vRapport(app) {
   var acties = el('div', { class: 'row' });
   if (gen) {
     acties.appendChild(el('button', { class: 'btn ghost', type: 'button', id: 'bekijk', onclick: function () {
-      var u = URL.createObjectURL(gen.blob), w = window.open(u, '_blank');
-      if (!w) location.href = u;
-      setTimeout(function () { URL.revokeObjectURL(u); }, 120000); } }, ['Bekijk rapport']));
+      bekijkPdf(gen); } }, ['Bekijk rapport']));
     acties.appendChild(el('button', { class: 'btn', type: 'button', id: 'deel', onclick: function () { track('rapport_gedeeld'); deel(gen.blob, gen.naam, 'application/pdf'); } }, ['Deel rapport']));
     status.textContent = gen.naam + ' (' + Math.round(gen.blob.size / 1024) + ' kB) staat klaar.';
   }
   acties.appendChild(el('button', { class: gen ? 'btn ghost' : 'btn', type: 'button', id: 'pdf', onclick: function (e) {
     var b = e.currentTarget; b.disabled = true; b.textContent = 'Rapport maken…';
-    saveNow().then(maakPdf).then(function (blob) { gen = { blob: blob, naam: bestandsnaam('pdf') }; track('rapport_gemaakt'); render(); })
+    saveNow().then(maakPdf).then(function (blob) { gen = { blob: blob, naam: bestandsnaam('pdf') }; return bewaarPdf(gen); }).then(function () { track('rapport_gemaakt'); render(); })
       .catch(function (err) { b.disabled = false; b.textContent = 'Maak rapport'; status.textContent = 'Rapport maken mislukte: ' + (err && err.message || err); });
   } }, [gen ? 'Maak opnieuw' : 'Maak rapport']));
   app.appendChild(el('div', { class: 'card' }, [el('h2', {}, ['Rapport']), dl, acties, status]));
@@ -916,4 +933,26 @@ Promise.all([laadConfig(), openDB()]).then(function (r) {
   if (!DB) $('#app').insertBefore(el('div', { class: 'warn' }, ['Opslaan op dit toestel is niet beschikbaar (privévenster?). Gesprekken verdwijnen als u de pagina sluit.']), $('#app').firstChild);
 });
 window.__rondgang = { get G() { return G; }, get CFG() { return CFG; } };
+})();
+
+/* iOS: na toetsenbord/dictaat of terugkomen uit de pdf-viewer blijft de vaste tabbalk soms halverwege het scherm hangen.
+   Tijdens typen verbergen we de balk; daarna dwingen we iOS de positie opnieuw te berekenen. */
+(function () {
+  function typVeld(t) {
+    return !!t && (t.tagName === 'TEXTAREA' || t.isContentEditable ||
+      (t.tagName === 'INPUT' && !/^(button|checkbox|radio|file|submit|reset|range|color)$/i.test(t.type || '')));
+  }
+  function herstel() {
+    requestAnimationFrame(function () {
+      var y = window.scrollY; window.scrollTo(window.scrollX, y + 1); window.scrollTo(window.scrollX, y);
+    });
+  }
+  document.addEventListener('focusin', function (e) { if (typVeld(e.target)) document.body.classList.add('typen'); });
+  document.addEventListener('focusout', function () {
+    setTimeout(function () { if (!typVeld(document.activeElement)) { document.body.classList.remove('typen'); herstel(); } }, 60);
+  });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', herstel);
+  window.addEventListener('pageshow', herstel);
+  window.addEventListener('orientationchange', herstel);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) herstel(); });
 })();

@@ -1,4 +1,4 @@
-var V = 'rondgang-202611051010';
+var V = 'rondgang-202611111000';
 var A = ['./', 'index.html', 'style.css', 'app.js', 'teksten.js', 'version.js', 'config.json', 'manifest.webmanifest', 'logo.png',
   'vendor/jspdf.umd.min.js', 'icon-180.png', 'icon-192.png', 'icon-512.png',
   'fonts/playfair-display-latin-600-normal.woff2', 'fonts/playfair-display-latin-700-normal.woff2',
@@ -9,13 +9,21 @@ self.addEventListener('install', function (e) {
 });
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (ks) {
-    return Promise.all(ks.filter(function (k) { return k !== V; }).map(function (k) { return caches.delete(k); }));
+    return Promise.all(ks.filter(function (k) { return k !== V && k !== 'intake-rapport'; }).map(function (k) { return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
 });
 /* Eerst het netwerk (dan zie je updates direct), bij geen of trage verbinding de opgeslagen versie. */
 self.addEventListener('fetch', function (e) {
   var r = e.request;
   if (r.method !== 'GET' || new URL(r.url).origin !== location.origin) return;
+  /* Rapport-pdf: staat alleen in de cache op dit toestel (zie bewaarPdf in app.js), nooit op de server. */
+  if (/\/rapport\/[^/]+\.pdf$/.test(new URL(r.url).pathname)) {
+    e.respondWith(caches.open('intake-rapport').then(function (c) { return c.match(r.url); }).then(function (m) {
+      return m || new Response('Dit rapport is niet meer beschikbaar. Maak het rapport opnieuw in BW Intake.',
+        { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+    }));
+    return;
+  }
   e.respondWith(new Promise(function (res) {
     var done = false;
     var fall = function () { caches.match(r, { ignoreSearch: true }).then(function (m) { if (!done) { done = true; res(m || fetch(r)); } }); };

@@ -22,7 +22,7 @@
   --soft:#3a2929; --warn:#f0b75a; --warn-bg:#3a2d12; --danger:#ff9a8f; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:17px/1.45 var(--body);margin:0;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 110px}
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px calc(110px + env(safe-area-inset-bottom,0px))}
 .wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
 header{display:flex;justify-content:space-between;align-items:center;gap:12px}
 header .title{display:flex;align-items:center;gap:12px;min-width:0}
@@ -63,7 +63,7 @@ textarea{min-height:110px;resize:vertical}
 .warn{background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:10px 12px;font-size:14px}
 .stack{display:flex;flex-direction:column;gap:10px}
 .inline{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center}
-nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;
+nav{position:fixed;left:0;right:0;bottom:0;z-index:10;transform:translateZ(0);background:var(--card);border-top:1px solid var(--line);display:flex;
   padding:8px max(8px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));gap:6px}
 nav button{flex:1;font:500 15px var(--body);min-height:48px;border-radius:6px;border:0;background:transparent;color:var(--muted);cursor:pointer}
 nav button[aria-current=page]{background:var(--soft);color:var(--ink)}
@@ -111,7 +111,7 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 
 /* iPad en groter: ruimere kaders en twee kolommen tijdens een gesprek */
 @media (min-width:700px){
-  body{font-size:19px;padding-block:20px 120px}
+  body{font-size:19px;padding-block:20px calc(130px + env(safe-area-inset-bottom,0px))}
   .wrap{max-width:720px;gap:20px}
   h1{font-size:34px} h2{font-size:26px}
   .card{padding:22px;gap:14px}
@@ -134,3 +134,7 @@ a.btn{display:inline-flex;align-items:center;justify-content:center;text-decorat
 
 /* Was an inline <style> in index.html; moved here so the CSP can use style-src 'self' (see .htaccess). */
 :root{color-scheme:light dark;padding-top:env(safe-area-inset-top,0px)}
+
+/* Tijdens typen (toetsenbord open) geen tabbalk; die zweeft anders op iOS over de pagina. */
+body.typen nav{display:none}
+body.typen #cookie.metnav{bottom:0}
